@@ -55,7 +55,15 @@ Abrir [http://localhost:3000](http://localhost:3000)
 | Almacén | almacen@inventarios.local | almacen123 |
 | Vendedor | vendedor@inventarios.local | vendedor123 |
 
-## Deploy gratis (Vercel + Neon) — recomendado
+## Deploy en la nube
+
+Guía completa paso a paso: **[DEPLOY.md](DEPLOY.md)**
+
+Scripts de ayuda:
+- `scripts/push-github.ps1` — push a GitHub
+- `scripts/vercel-env-checklist.ps1` — checklist de variables Vercel
+
+## Deploy gratis (Vercel + Neon) — resumen
 
 ```mermaid
 flowchart LR
@@ -121,3 +129,4 @@ npm run db:seed
 - `npm run db:push` — sincronizar esquema BD
 - `npm run db:seed` — datos demo
 - `npm run db:setup` — push + seed en un comando
+- `npm run verify:users` — comprobar usuarios demo alpha/beta/gama
