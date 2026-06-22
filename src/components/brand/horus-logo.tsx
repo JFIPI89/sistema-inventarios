@@ -1,12 +1,26 @@
-import Image from "next/image";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
-
-const LOGO_SRC = "/brand/distribuidora-horus-logo.png";
+import { HorusLogoMark } from "@/components/brand/horus-logo-mark";
 
 const sizes = {
-  sm: { width: 120, height: 40, className: "h-8 w-auto max-w-[120px]" },
-  md: { width: 160, height: 53, className: "h-10 w-auto max-w-[160px]" },
-  lg: { width: 220, height: 73, className: "h-14 w-auto max-w-[220px]" },
+  sm: {
+    mark: "sm" as const,
+    label: "text-[8px] tracking-[0.18em]",
+    title: "text-sm tracking-[0.12em]",
+    gap: "gap-2",
+  },
+  md: {
+    mark: "md" as const,
+    label: "text-[9px] tracking-[0.2em]",
+    title: "text-base tracking-[0.14em]",
+    gap: "gap-2.5",
+  },
+  lg: {
+    mark: "lg" as const,
+    label: "text-[10px] tracking-[0.22em]",
+    title: "text-xl tracking-[0.16em]",
+    gap: "gap-3",
+  },
 } as const;
 
 export function HorusLogo({
@@ -19,20 +33,29 @@ export function HorusLogo({
   const s = sizes[size];
 
   return (
-    <div
+    <Link
+      href="/"
+      aria-label="Ir al inicio — Distribuidora Horus"
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-md bg-[#1a1a1a] px-2 py-1",
+        "inline-flex shrink-0 items-center rounded-md text-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)] focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        s.gap,
         className
       )}
     >
-      <Image
-        src={LOGO_SRC}
-        alt="Distribuidora Horus"
-        width={s.width}
-        height={s.height}
-        className={cn(s.className, "object-contain")}
-        priority={size === "lg"}
-      />
-    </div>
+      <HorusLogoMark size={s.mark} />
+      <span className="min-w-0 text-left leading-tight">
+        <span
+          className={cn(
+            "block font-cinzel font-bold uppercase text-muted-foreground",
+            s.label
+          )}
+        >
+          Distribuidora
+        </span>
+        <span className={cn("block font-cinzel font-black uppercase", s.title)}>
+          Horus
+        </span>
+      </span>
+    </Link>
   );
 }

@@ -6,13 +6,8 @@ import {
   getInventoryValuation,
   getSalesProfitReport,
 } from "@/actions/reports";
-import {
-  buildReportPdf,
-  type ReportPdfData,
-  type ReportSection,
-} from "@/lib/pdf/report-document";
-
-const VALID: ReportSection[] = ["sales", "products", "customers", "profit", "inventory"];
+import { buildReportPdf, type ReportPdfData } from "@/lib/pdf/report-document";
+import { parseSections } from "@/lib/reports/sections";
 
 export async function GET(request: NextRequest) {
   const start = request.nextUrl.searchParams.get("start") || "";
@@ -23,10 +18,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Fechas requeridas" }, { status: 400 });
   }
 
-  const sections = sectionsParam
-    .split(",")
-    .map((s) => s.trim())
-    .filter((s): s is ReportSection => VALID.includes(s as ReportSection));
+  const sections = parseSections(sectionsParam);
 
   if (sections.length === 0) {
     return NextResponse.json({ error: "Selecciona al menos una sección" }, { status: 400 });

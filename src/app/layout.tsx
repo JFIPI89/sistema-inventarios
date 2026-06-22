@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: "DISTRIBUIDORA HORUS — Inventarios",
   description: "Gestión de inventario, ventas y clientes con trazabilidad GS1",
   icons: {
-    icon: "/brand/distribuidora-horus-logo.png",
+    icon: "/brand/horus-icon.svg",
   },
 };
 

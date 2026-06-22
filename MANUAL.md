@@ -199,9 +199,9 @@ Menú **Informes** (`/reports`):
    - Utilidades
    - Inventario valorizado *(snapshot actual, sin filtro de fechas)*
 3. **Exportar PDF** — documento con hoja membretada **DISTRIBUIDORA HORUS** (logo, línea dorada, pie de página).
-4. **CSV ventas** / **CSV utilidades** — exportación para Excel (como antes).
+4. **Exportar CSV** — un solo archivo con las mismas secciones marcadas (bloques separados por título, compatible con Excel).
 
-Debes seleccionar al menos una sección para generar el PDF.
+Debes seleccionar al menos una sección para generar el PDF o el CSV.
 
 ---
 
@@ -307,6 +307,7 @@ Hoy no hay pantalla de usuarios; hay que hacerlo directamente en la base de dato
 | Ver entradas/salidas de stock | **Movimientos** |
 | Ver reportes y utilidades | **Informes** *(Admin)* |
 | Exportar PDF membretado | **Informes → Exportar informe → PDF** |
+| Exportar CSV por secciones | **Informes → Exportar informe → CSV** |
 | Ver quién modificó el sistema | **Histórico** *(Admin)* |
 
 ---

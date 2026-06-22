@@ -30,15 +30,19 @@ export function ReportsExportPanel({
     setError(null);
   }
 
-  function pdfUrl() {
+  function exportUrl(format: "pdf" | "csv") {
     if (selected.length === 0) return null;
-    return `/api/reports/export-pdf?start=${startDate}&end=${endDate}&sections=${selected.join(",")}`;
+    const base =
+      format === "pdf"
+        ? "/api/reports/export-pdf"
+        : "/api/reports/export-csv";
+    return `${base}?start=${startDate}&end=${endDate}&sections=${selected.join(",")}`;
   }
 
-  function handlePdfClick() {
-    const url = pdfUrl();
+  function handleExport(format: "pdf" | "csv") {
+    const url = exportUrl(format);
     if (!url) {
-      setError("Selecciona al menos una sección para el PDF.");
+      setError("Selecciona al menos una sección para exportar.");
       return;
     }
     window.location.href = url;
@@ -73,18 +77,11 @@ export function ReportsExportPanel({
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       <div className="flex flex-wrap gap-2">
-        <Button type="button" onClick={handlePdfClick}>
+        <Button type="button" onClick={() => handleExport("pdf")}>
           Exportar PDF
         </Button>
-        <Button type="button" variant="outline" asChild>
-          <a href={`/api/reports/export?start=${startDate}&end=${endDate}`}>
-            CSV ventas
-          </a>
-        </Button>
-        <Button type="button" variant="outline" asChild>
-          <a href={`/api/reports/export-profit?start=${startDate}&end=${endDate}`}>
-            CSV utilidades
-          </a>
+        <Button type="button" variant="outline" onClick={() => handleExport("csv")}>
+          Exportar CSV
         </Button>
       </div>
     </div>

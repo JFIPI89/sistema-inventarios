@@ -22,7 +22,7 @@ export default async function LoginPage() {
       </div>
       <div className="relative z-10 w-full max-w-md space-y-8">
         <div className="flex flex-col items-center text-center">
-          <HorusLogo size="lg" className="flex-col items-center gap-4 px-3 py-2" />
+          <HorusLogo size="lg" />
           <p className="mt-6 font-crimson italic text-muted-foreground">
             Inicia sesión para continuar
           </p>

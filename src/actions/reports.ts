@@ -3,7 +3,20 @@
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { canViewReports } from "@/lib/permissions";
+import type { ReportSection } from "@/lib/reports/sections";
 import { SaleStatus } from "@prisma/client";
+
+function csvCell(value: string | number | null | undefined): string {
+  const s = String(value ?? "");
+  if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+function csvRow(values: (string | number | null | undefined)[]): string {
+  return values.map(csvCell).join(",");
+}
 
 async function requireReports() {
   const session = await getSession();
@@ -229,30 +242,102 @@ export async function getSalesProfitReport(startDate: string, endDate: string) {
   };
 }
 
-export async function exportProfitCsv(startDate: string, endDate: string) {
-  const profit = await getSalesProfitReport(startDate, endDate);
-  const header =
-    "Producto,SKU,Unidades,Ingresos,Costo,Utilidad\n";
-  const rows = profit.byProduct.map((p) =>
-    [p.name, p.sku, p.units, p.revenue, p.cost, p.utility].join(",")
-  );
-  const footer = `\n\nResumen,,,,,\nIngresos netos,,,,,${profit.summary.totalRevenue}\nCosto total,,,,,${profit.summary.totalCost}\nUtilidad,,,,,${profit.summary.totalUtility}\nMargen %,,,,,${profit.summary.marginPercent.toFixed(2)}`;
-  return header + rows.join("\n") + footer;
-}
+export async function exportReportCsv(
+  startDate: string,
+  endDate: string,
+  sections: ReportSection[]
+) {
+  await requireReports();
 
-export async function exportSalesCsv(startDate: string, endDate: string) {
-  const { sales } = await getSalesByPeriod(startDate, endDate);
-  const header = "Numero,Fecha,Cliente,Subtotal,Descuento,Total,Estado\n";
-  const rows = sales.map((s) =>
-    [
-      s.saleNumber,
-      s.saleDate.toISOString(),
+  const blocks: string[] = [];
+
+  if (sections.includes("sales")) {
+    const { sales, summary } = await getSalesByPeriod(startDate, endDate);
+    const rows = sales.map((s) =>
+      csvRow([
+        s.saleNumber,
+        s.saleDate.toISOString(),
+        "",
+        s.subtotal,
+        s.discount,
+        s.total,
+        s.status,
+      ])
+    );
+    blocks.push(
+      `=== Ventas del periodo (${startDate} — ${endDate}) ===`,
+      "Numero,Fecha,Cliente,Subtotal,Descuento,Total,Estado",
+      ...rows,
       "",
-      s.subtotal,
-      s.discount,
-      s.total,
-      s.status,
-    ].join(",")
-  );
-  return header + rows.join("\n");
+      csvRow(["Total ventas", "", "", "", "", summary.total, `${summary.count} transacciones`])
+    );
+  }
+
+  if (sections.includes("products")) {
+    const products = await getSalesByProduct(startDate, endDate);
+    const rows = products.map((p) =>
+      csvRow([p.name, p.sku, p.units, p.revenue])
+    );
+    blocks.push(
+      `=== Top productos (${startDate} — ${endDate}) ===`,
+      "Producto,SKU,Unidades,Ingresos",
+      ...rows
+    );
+  }
+
+  if (sections.includes("customers")) {
+    const customers = await getSalesByCustomer(startDate, endDate);
+    const rows = customers.map((c) =>
+      csvRow([c.name, c.code, c.count, c.total])
+    );
+    blocks.push(
+      `=== Top clientes (${startDate} — ${endDate}) ===`,
+      "Cliente,Codigo,Compras,Total",
+      ...rows
+    );
+  }
+
+  if (sections.includes("profit")) {
+    const profit = await getSalesProfitReport(startDate, endDate);
+    const rows = profit.byProduct.map((p) =>
+      csvRow([p.name, p.sku, p.units, p.revenue, p.cost, p.utility])
+    );
+    blocks.push(
+      `=== Utilidades (${startDate} — ${endDate}) ===`,
+      "Producto,SKU,Unidades,Ingresos,Costo,Utilidad",
+      ...rows,
+      "",
+      "Resumen,,,,,",
+      csvRow(["Ingresos netos", "", "", "", "", profit.summary.totalRevenue]),
+      csvRow(["Costo total", "", "", "", "", profit.summary.totalCost]),
+      csvRow(["Utilidad", "", "", "", "", profit.summary.totalUtility]),
+      csvRow(["Margen %", "", "", "", "", profit.summary.marginPercent.toFixed(2)])
+    );
+  }
+
+  if (sections.includes("inventory")) {
+    const inventory = await getInventoryValuation();
+    const total = inventory.reduce((s, r) => s + r.value, 0);
+    const rows = inventory.map((i) =>
+      csvRow([
+        i.productName,
+        i.sku,
+        i.brand ?? "",
+        i.lotNumber,
+        i.quantity,
+        i.costPrice,
+        i.value,
+        i.expirationDate?.toISOString().slice(0, 10) ?? "",
+      ])
+    );
+    blocks.push(
+      "=== Inventario valorizado (snapshot) ===",
+      "Producto,SKU,Marca,Lote,Cantidad,Costo unitario,Valor,Vencimiento",
+      ...rows,
+      "",
+      csvRow(["Total inventario", "", "", "", "", "", total])
+    );
+  }
+
+  return blocks.join("\n");
 }

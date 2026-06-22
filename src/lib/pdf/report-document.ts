@@ -10,12 +10,9 @@ const MARGIN = 50;
 const PAGE_WIDTH = 612;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 
-export type ReportSection =
-  | "sales"
-  | "products"
-  | "customers"
-  | "profit"
-  | "inventory";
+import type { ReportSection } from "@/lib/reports/sections";
+
+export type { ReportSection };
 
 export type ReportPdfData = {
   startDate: string;
