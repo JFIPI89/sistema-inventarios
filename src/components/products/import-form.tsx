@@ -4,9 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { importProductsCsv, type ImportRowResult } from "@/actions/import-products";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { FileInput } from "@/components/ui/file-input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -24,10 +25,13 @@ export function ImportProductsForm() {
   const [summary, setSummary] = useState<{ created: number; updated: number; errors: number } | null>(
     null
   );
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  async function handleSubmit(formData: FormData) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     setLoading(true);
     setError(null);
+    const formData = new FormData(e.currentTarget);
     const result = await importProductsCsv(formData);
     setLoading(false);
     if (result.error) {
@@ -46,20 +50,18 @@ export function ImportProductsForm() {
           <CardTitle>Subir archivo CSV</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="file">Archivo CSV</Label>
-              <input
+              <FileInput
                 id="file"
                 name="file"
-                type="file"
-                accept=".csv,text/csv"
                 required
-                className="block w-full text-sm"
+                onFileChange={setSelectedFile}
               />
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || !selectedFile}>
               {loading ? "Importando..." : "Importar productos"}
             </Button>
           </form>

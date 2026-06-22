@@ -22,6 +22,7 @@ export async function middleware(request: NextRequest) {
 
   const roleRoutes: Record<string, string[]> = {
     "/products": ["ADMIN", "WAREHOUSE"],
+    "/categories": ["ADMIN", "WAREHOUSE"],
     "/lots": ["ADMIN", "WAREHOUSE"],
     "/suppliers": ["ADMIN", "WAREHOUSE"],
     "/stock": ["ADMIN", "WAREHOUSE"],

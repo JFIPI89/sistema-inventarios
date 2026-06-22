@@ -6,6 +6,7 @@ import { canWriteProducts } from "@/lib/permissions";
 import { getSession } from "@/lib/auth";
 import { validateGtin, normalizeGtin } from "@/lib/gs1";
 import { logAudit } from "@/lib/audit";
+import { findOrCreateCategoryByName } from "@/actions/categories";
 
 export type ImportRowResult = {
   row: number;
@@ -64,8 +65,7 @@ export async function importProductsCsv(formData: FormData) {
   const col = (key: string) => header.indexOf(key);
   const results: ImportRowResult[] = [];
 
-  const categories = await prisma.category.findMany();
-  const categoryByName = new Map(categories.map((c) => [c.name.toLowerCase(), c.id]));
+  const categoryCache = new Map<string, string>();
 
   for (let i = 1; i < lines.length; i++) {
     const rowNum = i + 1;
@@ -86,9 +86,14 @@ export async function importProductsCsv(formData: FormData) {
     }
 
     const categoryName = col("category") >= 0 ? cells[col("category")]?.trim() : "";
-    const categoryId = categoryName
-      ? categoryByName.get(categoryName.toLowerCase()) ?? null
-      : null;
+    let categoryId: string | null = null;
+    if (categoryName) {
+      const cacheKey = categoryName.toLowerCase();
+      if (!categoryCache.has(cacheKey)) {
+        categoryCache.set(cacheKey, await findOrCreateCategoryByName(categoryName));
+      }
+      categoryId = categoryCache.get(cacheKey) ?? null;
+    }
 
     const data = {
       name,
@@ -124,6 +129,7 @@ export async function importProductsCsv(formData: FormData) {
   }
 
   revalidatePath("/products");
+  revalidatePath("/categories");
   const summary = {
     created: results.filter((r) => r.status === "created").length,
     updated: results.filter((r) => r.status === "updated").length,

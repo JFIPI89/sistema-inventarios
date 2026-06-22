@@ -1,11 +1,10 @@
 import PDFDocument from "pdfkit";
-import { readFileSync } from "fs";
-import { join } from "path";
+import { drawHorusMarkPdf, PDF_BRAND } from "@/lib/pdf/horus-mark";
 
 type PdfDoc = InstanceType<typeof PDFDocument>;
 
-const GOLD = "#C9A84C";
-const CHARCOAL = "#1a1a1a";
+const GOLD = PDF_BRAND.GOLD;
+const CHARCOAL = PDF_BRAND.CHARCOAL;
 const MARGIN = 50;
 const PAGE_WIDTH = 612;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
@@ -64,10 +63,6 @@ function money(n: number): string {
   }).format(n);
 }
 
-function logoPath(): string {
-  return join(process.cwd(), "public/brand/distribuidora-horus-logo.png");
-}
-
 function drawLetterhead(
   doc: PdfDoc,
   title: string,
@@ -76,35 +71,35 @@ function drawLetterhead(
   compact = false
 ) {
   const bandHeight = compact ? 56 : 72;
+  const markSize = compact ? 40 : 48;
+  const textX = MARGIN + markSize + 12;
 
   doc.rect(0, 0, PAGE_WIDTH, bandHeight).fill(CHARCOAL);
 
-  try {
-    const logo = readFileSync(logoPath());
-    doc.image(logo, MARGIN, compact ? 8 : 10, { height: compact ? 36 : 48 });
-  } catch {
-    doc.fillColor("#ffffff").fontSize(compact ? 12 : 14).text("DISTRIBUIDORA HORUS", MARGIN, compact ? 18 : 24);
-  }
+  drawHorusMarkPdf(doc, MARGIN, compact ? 8 : 10, markSize);
+
+  doc
+    .fillColor("#8a8580")
+    .fontSize(compact ? 7 : 8)
+    .text("DISTRIBUIDORA", textX, compact ? 12 : 14);
 
   doc
     .fillColor(GOLD)
-    .fontSize(compact ? 9 : 10)
-    .text("DISTRIBUIDORA HORUS", MARGIN + (compact ? 100 : 120), compact ? 14 : 18, {
-      width: 200,
-    });
+    .fontSize(compact ? 11 : 13)
+    .text("HORUS", textX, compact ? 22 : 26);
 
   doc
     .fillColor("#cccccc")
     .fontSize(compact ? 8 : 9)
-    .text(title, MARGIN + (compact ? 100 : 120), compact ? 28 : 36, { width: 280 });
+    .text(title, textX, compact ? 36 : 44, { width: 220 });
 
   if (!compact) {
     doc
       .fillColor("#999999")
       .fontSize(8)
-      .text(`Período: ${startDate} — ${endDate}`, MARGIN + 120, 52, { width: 280 });
-    doc.text(`Generado: ${new Date().toLocaleString("es-MX")}`, 350, 52, {
-      width: 200,
+      .text(`Período: ${startDate} — ${endDate}`, 320, 18, { width: 240, align: "right" });
+    doc.text(`Generado: ${new Date().toLocaleString("es-MX")}`, 320, 32, {
+      width: 240,
       align: "right",
     });
   }

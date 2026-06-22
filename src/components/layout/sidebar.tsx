@@ -13,6 +13,7 @@ import {
   Truck,
   History,
   ScrollText,
+  Tags,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ import { ThemeToggle } from "@/components/layout/theme-toggle";
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, resource: null },
   { href: "/products", label: "Productos", icon: Package, resource: "products" as const },
+  { href: "/categories", label: "Categorías", icon: Tags, resource: "products" as const },
   { href: "/lots", label: "Lotes", icon: Boxes, resource: "lots" as const },
   { href: "/suppliers", label: "Proveedores", icon: Truck, resource: "suppliers" as const },
   { href: "/stock/history", label: "Movimientos", icon: History, resource: "stock" as const },

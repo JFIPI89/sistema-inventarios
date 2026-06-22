@@ -55,7 +55,9 @@ export default async function ProductsPage({
               <TableHead>GTIN</TableHead>
               <TableHead>Nombre</TableHead>
               <TableHead>Marca</TableHead>
+              <TableHead>Categoría</TableHead>
               <TableHead>Stock</TableHead>
+              <TableHead>Precio costo</TableHead>
               <TableHead>Precio venta</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead></TableHead>
@@ -70,9 +72,11 @@ export default async function ProductsPage({
                   <TableCell className="font-mono text-xs">{p.gtin || "—"}</TableCell>
                   <TableCell>{p.name}</TableCell>
                   <TableCell>{p.brand || "—"}</TableCell>
+                  <TableCell>{p.category?.name || "—"}</TableCell>
                   <TableCell>
                     <Badge variant={stock <= p.minStock ? "warning" : "success"}>{stock}</Badge>
                   </TableCell>
+                  <TableCell>{formatCurrency(p.costPrice)}</TableCell>
                   <TableCell>{formatCurrency(p.salePrice)}</TableCell>
                   <TableCell>
                     <Badge variant={p.isActive ? "success" : "secondary"}>

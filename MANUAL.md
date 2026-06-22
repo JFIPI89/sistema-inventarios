@@ -45,7 +45,8 @@ Icono de sol/luna en el menú lateral. La preferencia se guarda en el navegador.
 | Menú | Ruta | Para qué sirve | Roles |
 |------|------|----------------|-------|
 | **Dashboard** | `/` | Ventas del día, alertas stock bajo, lotes por vencer | Todos |
-| **Productos** | `/products` | Catálogo (SKU, GTIN, precios). **No carga cantidad física** | Admin, Almacén |
+| **Productos** | `/products` | Catálogo (SKU, GTIN, precios costo/venta). **No carga cantidad física** | Admin, Almacén |
+| **Categorías** | `/categories` | Alta, edición y organización jerárquica del catálogo | Admin, Almacén |
 | **Lotes** | `/lots` | **Inventario físico** por lote | Admin, Almacén |
 | **Proveedores** | `/suppliers` | Alta y edición de proveedores | Admin, Almacén |
 | **Movimientos** | `/stock/history` | Kardex: entradas, salidas y ajustes | Admin, Almacén |
@@ -109,9 +110,21 @@ En la app: campo **"GTIN (AI 01)"** en producto.
 2. Mínimo: **SKU**, **Nombre**, precio costo, precio venta, stock mínimo
 3. Opcional: GTIN, marca, categoría, código de barras
 
-**Importación masiva:** **Productos → Importar CSV** — descarga la plantilla, complétala y súbela.
+**Importación masiva:** **Productos → Importar CSV** — descarga la plantilla, pulsa **Seleccionar archivo CSV** (botón visible), elige el archivo y **Importar productos**. Si el CSV incluye una categoría que no existe, se crea automáticamente.
 
 Columnas de la plantilla CSV: SKU, GTIN, nombre, marca, categoría, unidad, costo, precio venta, stock mínimo, descripción, código de barras.
+
+### Categorías de producto
+
+Menú **Categorías** (`/categories`):
+
+| Acción | Detalle |
+|--------|---------|
+| **Listar** | Nombre, categoría padre, cantidad de productos y subcategorías |
+| **Crear / editar** | Nombre obligatorio; categoría padre opcional |
+| **Eliminar** | Solo si no tiene productos ni subcategorías asociadas |
+
+Las categorías aparecen en el formulario de producto y en el listado de **Productos** (columna Categoría).
 
 ### Paso B — Entrada de stock
 
@@ -198,7 +211,7 @@ Menú **Informes** (`/reports`):
    - Top clientes
    - Utilidades
    - Inventario valorizado *(snapshot actual, sin filtro de fechas)*
-3. **Exportar PDF** — documento con hoja membretada **DISTRIBUIDORA HORUS** (logo, línea dorada, pie de página).
+3. **Exportar PDF** — documento con hoja membretada **DISTRIBUIDORA HORUS** (isotipo vectorial dorado, línea dorada, pie de página).
 4. **Exportar CSV** — un solo archivo con las mismas secciones marcadas (bloques separados por título, compatible con Excel).
 
 Debes seleccionar al menos una sección para generar el PDF o el CSV.
@@ -258,6 +271,7 @@ Filtros: búsqueda libre, usuario, acción, tipo de entidad, fechas.
 |---------|:-----:|:-------:|:--------:|
 | Dashboard | ✓ | ✓ | ✓ |
 | Productos (CRUD) | ✓ | ✓ | — |
+| Categorías | ✓ | ✓ | — |
 | Importar CSV | ✓ | ✓ | — |
 | Lotes / entradas / ajustes | ✓ | ✓ | — |
 | Proveedores | ✓ | ✓ | — |
@@ -295,6 +309,7 @@ Hoy no hay pantalla de usuarios; hay que hacerlo directamente en la base de dato
 |---------|--------|
 | Entrar en producción | https://sistema-inventarios-seven.vercel.app/login |
 | Crear artículo en catálogo | **Productos → Nuevo producto** |
+| Gestionar categorías | **Categorías → Nueva categoría** |
 | Cargar muchos productos | **Productos → Importar CSV** |
 | Poner GTIN | Campo **GTIN (AI 01)** en producto |
 | Cargar cantidad al almacén | **Lotes → Entrada de stock** |
