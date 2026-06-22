@@ -92,10 +92,20 @@ npx vercel --prod
 
 ## 4. Post-deploy
 
-1. Abrir `https://tu-proyecto.vercel.app/login`
+1. Abrir **https://sistema-inventarios-seven.vercel.app/login**
 2. Probar login: `alpha@inventarios.local` / `alpha123`
 3. Verificar dashboard, productos, ventas
 4. **Cambiar contraseñas demo** antes de uso real
+
+### URLs en producción
+
+| Recurso | URL |
+|---------|-----|
+| App | https://sistema-inventarios-seven.vercel.app |
+| GitHub | https://github.com/JFIPI89/sistema-inventarios |
+| Vercel dashboard | https://vercel.com/juanfcoarmenta89-8094s-projects/sistema-inventarios |
+
+> Conecta GitHub en Vercel (Account → Login Connections) para deploys automáticos en cada push.
 
 ---
 

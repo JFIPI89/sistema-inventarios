@@ -2,8 +2,7 @@
 # Usage: .\scripts\push-github.ps1 -GitHubUser YOUR_USERNAME -RepoName sistema-inventarios
 
 param(
-    [Parameter(Mandatory = $true)]
-    [string]$GitHubUser,
+    [string]$GitHubUser = "JFIPI89",
     [string]$RepoName = "sistema-inventarios"
 )
 
