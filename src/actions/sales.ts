@@ -1,0 +1,380 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { prisma } from "@/lib/db";
+import { getSession } from "@/lib/auth";
+import { canWriteSales } from "@/lib/permissions";
+import { PaymentMethod, SaleStatus, StockMovementType } from "@prisma/client";
+import { buildChanges, logAudit } from "@/lib/audit";
+
+async function requireSalesWrite() {
+  const session = await getSession();
+  if (!session || !canWriteSales(session.role)) {
+    throw new Error("No autorizado");
+  }
+  return session;
+}
+
+export async function getCustomers(search?: string) {
+  return prisma.customer.findMany({
+    where: search
+      ? {
+          OR: [
+            { name: { contains: search } },
+            { code: { contains: search } },
+            { email: { contains: search } },
+          ],
+        }
+      : undefined,
+    orderBy: { name: "asc" },
+  });
+}
+
+export async function getCustomer(id: string) {
+  return prisma.customer.findUnique({
+    where: { id },
+    include: {
+      sales: {
+        orderBy: { saleDate: "desc" },
+        take: 10,
+        include: { items: { include: { product: true } } },
+      },
+    },
+  });
+}
+
+export async function createCustomer(formData: FormData) {
+  const session = await getSession();
+  if (!session || !canWriteSales(session.role)) return { error: "No autorizado" };
+
+  const code = String(formData.get("code") || "").trim();
+  const name = String(formData.get("name") || "").trim();
+  if (!code || !name) return { error: "Código y nombre son requeridos" };
+
+  const customer = await prisma.customer.create({
+    data: {
+      code,
+      name,
+      email: String(formData.get("email") || "").trim() || null,
+      phone: String(formData.get("phone") || "").trim() || null,
+      taxId: String(formData.get("taxId") || "").trim() || null,
+      address: String(formData.get("address") || "").trim() || null,
+      notes: String(formData.get("notes") || "").trim() || null,
+    },
+  });
+
+  await logAudit({
+    session,
+    action: "CREATE",
+    entityType: "Customer",
+    entityId: customer.id,
+    entityLabel: code,
+    summary: `Alta de cliente ${code} — ${name}`,
+  });
+
+  revalidatePath("/customers");
+  return { success: true };
+}
+
+export async function updateCustomer(id: string, formData: FormData) {
+  const session = await getSession();
+  if (!session || !canWriteSales(session.role)) return { error: "No autorizado" };
+
+  const before = await prisma.customer.findUnique({ where: { id } });
+  if (!before) return { error: "Cliente no encontrado" };
+
+  const afterData = {
+    code: String(formData.get("code") || "").trim(),
+    name: String(formData.get("name") || "").trim(),
+    email: String(formData.get("email") || "").trim() || null,
+    phone: String(formData.get("phone") || "").trim() || null,
+    taxId: String(formData.get("taxId") || "").trim() || null,
+    address: String(formData.get("address") || "").trim() || null,
+    notes: String(formData.get("notes") || "").trim() || null,
+    isActive: formData.get("isActive") === "on",
+  };
+
+  await prisma.customer.update({ where: { id }, data: afterData });
+
+  await logAudit({
+    session,
+    action: "UPDATE",
+    entityType: "Customer",
+    entityId: id,
+    entityLabel: afterData.code,
+    summary: `Modificó cliente ${afterData.code}`,
+    changes: buildChanges(
+      { code: before.code, name: before.name, isActive: before.isActive },
+      { code: afterData.code, name: afterData.name, isActive: afterData.isActive }
+    ),
+  });
+
+  revalidatePath("/customers");
+  return { success: true };
+}
+
+export type CartItem = {
+  productId: string;
+  lotId: string;
+  productName: string;
+  lotNumber: string;
+  quantity: number;
+  unitPrice: number;
+};
+
+export async function searchProductsForSale(query: string) {
+  if (!query.trim()) return [];
+
+  return prisma.product.findMany({
+    where: {
+      isActive: true,
+      OR: [
+        { sku: { contains: query } },
+        { name: { contains: query } },
+        { barcode: { contains: query } },
+        { gtin: { contains: query } },
+      ],
+    },
+    include: {
+      lots: {
+        where: { quantity: { gt: 0 } },
+        orderBy: [{ expirationDate: "asc" }, { createdAt: "asc" }],
+      },
+    },
+    take: 20,
+  });
+}
+
+async function generateSaleNumber() {
+  const count = await prisma.sale.count();
+  const date = new Date();
+  const prefix = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}`;
+  return `V-${prefix}-${String(count + 1).padStart(5, "0")}`;
+}
+
+export async function createSale(data: {
+  customerId?: string;
+  paymentMethod: PaymentMethod;
+  discount: number;
+  items: CartItem[];
+}) {
+  const session = await requireSalesWrite();
+
+  if (!data.items.length) return { error: "El carrito está vacío" };
+
+  const saleNumber = await generateSaleNumber();
+  let subtotal = 0;
+
+  for (const item of data.items) {
+    subtotal += item.unitPrice * item.quantity;
+  }
+
+  const discount = data.discount || 0;
+  const total = Math.max(0, subtotal - discount);
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const sale = await tx.sale.create({
+        data: {
+          saleNumber,
+          customerId: data.customerId || null,
+          userId: session.id,
+          subtotal,
+          discount,
+          total,
+          paymentMethod: data.paymentMethod,
+          status: SaleStatus.COMPLETED,
+        },
+      });
+
+      for (const item of data.items) {
+        const lot = await tx.lot.findUnique({ where: { id: item.lotId } });
+        if (!lot || lot.quantity < item.quantity) {
+          throw new Error(`Stock insuficiente para ${item.productName} / ${item.lotNumber}`);
+        }
+
+        await tx.lot.update({
+          where: { id: item.lotId },
+          data: { quantity: lot.quantity - item.quantity },
+        });
+
+        await tx.stockMovement.create({
+          data: {
+            productId: item.productId,
+            lotId: item.lotId,
+            type: StockMovementType.OUT,
+            quantity: -item.quantity,
+            reference: saleNumber,
+          },
+        });
+
+        await tx.saleItem.create({
+          data: {
+            saleId: sale.id,
+            productId: item.productId,
+            lotId: item.lotId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            lineTotal: item.unitPrice * item.quantity,
+          },
+        });
+      }
+    });
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Error al registrar venta" };
+  }
+
+  const saleRecord = await prisma.sale.findUnique({ where: { saleNumber } });
+
+  await logAudit({
+    session,
+    action: "CREATE",
+    entityType: "Sale",
+    entityId: saleRecord?.id,
+    entityLabel: saleNumber,
+    summary: `Venta ${saleNumber} por ${total.toFixed(2)} (${data.items.length} ítems)`,
+    changes: {
+      items: data.items.map((i) => ({
+        product: i.productName,
+        lot: i.lotNumber,
+        qty: i.quantity,
+        price: i.unitPrice,
+      })),
+      discount,
+      paymentMethod: data.paymentMethod,
+    },
+  });
+
+  revalidatePath("/sales");
+  revalidatePath("/lots");
+  revalidatePath("/");
+  revalidatePath("/reports");
+  return { success: true, saleNumber };
+}
+
+export async function getSales(search?: string) {
+  return prisma.sale.findMany({
+    where: search
+      ? {
+          OR: [
+            { saleNumber: { contains: search } },
+            { customer: { name: { contains: search } } },
+          ],
+        }
+      : undefined,
+    include: {
+      customer: true,
+      user: { select: { name: true } },
+      items: { include: { product: true, lot: true } },
+    },
+    orderBy: { saleDate: "desc" },
+    take: 100,
+  });
+}
+
+export async function getSale(id: string) {
+  return prisma.sale.findUnique({
+    where: { id },
+    include: {
+      customer: true,
+      user: { select: { name: true, email: true } },
+      items: { include: { product: true, lot: true } },
+    },
+  });
+}
+
+export async function cancelSale(id: string) {
+  const session = await requireSalesWrite();
+
+  const sale = await prisma.sale.findUnique({
+    where: { id },
+    include: { items: true },
+  });
+
+  if (!sale || sale.status === SaleStatus.CANCELLED) {
+    return { error: "Venta no encontrada o ya cancelada" };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    for (const item of sale.items) {
+      await tx.lot.update({
+        where: { id: item.lotId },
+        data: { quantity: { increment: item.quantity } },
+      });
+      await tx.stockMovement.create({
+        data: {
+          productId: item.productId,
+          lotId: item.lotId,
+          type: StockMovementType.IN,
+          quantity: item.quantity,
+          reference: `Anulación ${sale.saleNumber}`,
+        },
+      });
+    }
+    await tx.sale.update({
+      where: { id },
+      data: { status: SaleStatus.CANCELLED },
+    });
+  });
+
+  await logAudit({
+    session,
+    action: "CANCEL",
+    entityType: "Sale",
+    entityId: id,
+    entityLabel: sale.saleNumber,
+    summary: `Canceló venta ${sale.saleNumber} (stock restaurado)`,
+    changes: {
+      items: sale.items.map((i) => ({ productId: i.productId, lotId: i.lotId, qty: i.quantity })),
+    },
+  });
+
+  revalidatePath("/sales");
+  revalidatePath("/lots");
+  return { success: true };
+}
+
+export async function getDashboardStats() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const [todaySales, totalProducts, lowStock, expiringLots] = await Promise.all([
+    prisma.sale.aggregate({
+      where: {
+        saleDate: { gte: today, lt: tomorrow },
+        status: SaleStatus.COMPLETED,
+      },
+      _sum: { total: true },
+      _count: true,
+    }),
+    prisma.product.count({ where: { isActive: true } }),
+    prisma.product.findMany({
+      where: { isActive: true },
+      include: { lots: { select: { quantity: true } } },
+    }),
+    prisma.lot.count({
+      where: {
+        expirationDate: {
+          lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          gte: new Date(),
+        },
+        quantity: { gt: 0 },
+      },
+    }),
+  ]);
+
+  const lowStockCount = lowStock.filter((p) => {
+    const total = p.lots.reduce((s, l) => s + l.quantity, 0);
+    return total <= p.minStock;
+  }).length;
+
+  return {
+    todayTotal: todaySales._sum.total || 0,
+    todayCount: todaySales._count,
+    totalProducts,
+    lowStockCount,
+    expiringLots,
+  };
+}

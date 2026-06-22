@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  SELLER
+  WAREHOUSE
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  ADJUST
+}
+
+enum SaleStatus {
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+  OTHER
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  IMPORT
+  CANCEL
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  name         String
+  role         Role       @default(SELLER)
+  createdAt    DateTime   @default(now())
+  sales        Sale[]
+  auditLogs    AuditLog[]
+}
+
+model Category {
+  id       String     @id @default(cuid())
+  name     String
+  parentId String?
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+  products Product[]
+}
+
+model Supplier {
+  id   String @id @default(cuid())
+  name String
+  lots Lot[]
+}
+
+model Product {
+  id             String          @id @default(cuid())
+  sku            String          @unique
+  gtin           String?
+  name           String
+  description    String?
+  brand          String?
+  categoryId     String?
+  category       Category?       @relation(fields: [categoryId], references: [id])
+  unitOfMeasure  String          @default("pza")
+  costPrice      Float           @default(0)
+  salePrice      Float           @default(0)
+  minStock       Int             @default(0)
+  barcode        String?
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  lots           Lot[]
+  saleItems      SaleItem[]
+  stockMovements StockMovement[]
+}
+
+model Lot {
+  id             String          @id @default(cuid())
+  productId      String
+  product        Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  lotNumber      String
+  serialNumber   String?
+  productionDate DateTime?
+  expirationDate DateTime?
+  bestBeforeDate DateTime?
+  quantity       Int             @default(0)
+  location       String?
+  supplierId     String?
+  supplier       Supplier?       @relation(fields: [supplierId], references: [id])
+  createdAt      DateTime        @default(now())
+  saleItems      SaleItem[]
+  stockMovements StockMovement[]
+
+  @@unique([productId, lotNumber])
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  email     String?
+  phone     String?
+  taxId     String?
+  address   String?
+  notes     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  sales     Sale[]
+}
+
+model Sale {
+  id            String        @id @default(cuid())
+  saleNumber    String        @unique
+  customerId    String?
+  customer      Customer?     @relation(fields: [customerId], references: [id])
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  saleDate      DateTime      @default(now())
+  subtotal      Float
+  tax           Float         @default(0)
+  discount      Float         @default(0)
+  total         Float
+  paymentMethod PaymentMethod @default(CASH)
+  status        SaleStatus    @default(COMPLETED)
+  items         SaleItem[]
+  createdAt     DateTime      @default(now())
+}
+
+model SaleItem {
+  id        String  @id @default(cuid())
+  saleId    String
+  sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  lotId     String
+  lot       Lot     @relation(fields: [lotId], references: [id])
+  quantity  Int
+  unitPrice Float
+  lineTotal Float
+}
+
+model StockMovement {
+  id        String            @id @default(cuid())
+  productId String
+  product   Product           @relation(fields: [productId], references: [id])
+  lotId     String
+  lot       Lot               @relation(fields: [lotId], references: [id])
+  type      StockMovementType
+  quantity  Int
+  reference String?
+  notes     String?
+  createdAt DateTime          @default(now())
+}
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  userId      String?
+  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userName    String
+  userEmail   String?
+  action      AuditAction
+  entityType  String
+  entityId    String?
+  entityLabel String?
+  summary     String
+  changes     Json?
+  createdAt   DateTime    @default(now())
+
+  @@index([createdAt(sort: Desc)])
+  @@index([userId])
+  @@index([entityType, entityId])
+}

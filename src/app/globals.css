@@ -1,0 +1,210 @@
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Space+Mono:wght@400;700&display=swap");
+@import "tailwindcss";
+
+:root {
+  --gold: #c9a84c;
+  --gold-light: #e8c97a;
+  --gold-dim: #8b6b2a;
+  --accent: #d4543a;
+
+  --background: #f5f2ec;
+  --foreground: #1a1816;
+  --surface: #ffffff;
+  --primary: #c9a84c;
+  --primary-foreground: #0a0a0a;
+  --success: #2d6a4f;
+  --warning: #b45309;
+  --destructive: #d4543a;
+  --border: #e5dfd3;
+  --muted-foreground: #8a8580;
+  --sidebar: #faf8f4;
+  --sidebar-foreground: #1a1816;
+  --sidebar-border: rgba(201, 168, 76, 0.2);
+  --sidebar-active: rgba(201, 168, 76, 0.15);
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #f0ede8;
+  --surface: #1a1a1a;
+  --primary: #c9a84c;
+  --primary-foreground: #0a0a0a;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --destructive: #d4543a;
+  --border: rgba(201, 168, 76, 0.15);
+  --muted-foreground: #8a8580;
+  --sidebar: #1a1a1a;
+  --sidebar-foreground: #f0ede8;
+  --sidebar-border: rgba(201, 168, 76, 0.15);
+  --sidebar-active: rgba(201, 168, 76, 0.12);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-gold: var(--gold);
+  --color-gold-light: var(--gold-light);
+  --color-gold-dim: var(--gold-dim);
+  --color-accent: var(--accent);
+  --font-sans: "Crimson Pro", Georgia, serif;
+  --font-cinzel: "Cinzel", serif;
+  --font-space-mono: "Space Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+}
+
+.dark body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.35;
+}
+
+.font-cinzel {
+  font-family: var(--font-cinzel);
+}
+
+.font-space-mono {
+  font-family: var(--font-space-mono);
+}
+
+.font-crimson {
+  font-family: var(--font-sans);
+}
+
+.gold-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+
+.app-page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .app-page-header {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+}
+
+.app-page-title {
+  font-family: var(--font-cinzel);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+@media (min-width: 640px) {
+  .app-page-title {
+    font-size: 1.875rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  .app-page-title {
+    font-size: 2.25rem;
+  }
+}
+
+.app-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.app-search-form {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .app-search-form {
+    max-width: 28rem;
+    flex-direction: row;
+  }
+}
+
+.app-main-content {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 2400px;
+  padding: 1rem;
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 640px) {
+  .app-main-content {
+    padding: 1.5rem;
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-main-content {
+    padding: 2rem;
+    padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (min-width: 1920px) {
+  .app-main-content {
+    padding: 2.5rem;
+  }
+}
+
+.app-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+h1,
+h2,
+h3,
+.card-title {
+  font-family: var(--font-cinzel);
+  letter-spacing: 0.02em;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--gold-dim);
+  border-radius: 3px;
+}
