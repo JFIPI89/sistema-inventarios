@@ -307,12 +307,6 @@ export function ReportsClient({
                 {formatCurrency(profit.summary.totalUtility)}
               </span>
             </p>
-            <a
-              href={`/api/reports/export-profit?start=${startDate}&end=${endDate}`}
-              className="text-sm text-primary hover:underline"
-            >
-              Exportar utilidades CSV
-            </a>
           </div>
         </CardContent>
       </Card>

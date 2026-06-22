@@ -72,7 +72,7 @@ export function DashboardShell({
           >
             <Menu className="h-5 w-5" />
           </button>
-          <HorusLogo size="sm" subtitle="" />
+          <HorusLogo size="sm" />
           <ThemeToggle compact />
         </header>
 

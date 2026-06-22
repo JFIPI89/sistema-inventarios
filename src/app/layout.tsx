@@ -3,8 +3,11 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 
 export const metadata: Metadata = {
-  title: "Horus — Inventarios",
+  title: "DISTRIBUIDORA HORUS — Inventarios",
   description: "Gestión de inventario, ventas y clientes con trazabilidad GS1",
+  icons: {
+    icon: "/brand/distribuidora-horus-logo.png",
+  },
 };
 
 export const viewport: Viewport = {

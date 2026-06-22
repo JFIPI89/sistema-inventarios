@@ -1,4 +1,4 @@
-# Manual de operación — Horus Inventarios
+# Manual de operación — DISTRIBUIDORA HORUS Inventarios
 
 Guía práctica para operar el sistema: catálogo, entradas de stock, ventas, clientes, proveedores, informes y auditoría.
 
@@ -189,7 +189,19 @@ Menú **Informes** (`/reports`):
 | **Inventario valorizado** | Stock por lote con valor a costo |
 | **Utilidades** | Ingresos, costo, utilidad y margen por periodo |
 
-**Exportar CSV:** botones de exportación en la misma pantalla (ventas y utilidades).
+**Exportar informes:** panel **Exportar informe** en la misma pantalla.
+
+1. Elige el rango **Desde / Hasta** y pulsa **Filtrar**.
+2. Marca las secciones que quieres incluir:
+   - Ventas del período
+   - Top productos
+   - Top clientes
+   - Utilidades
+   - Inventario valorizado *(snapshot actual, sin filtro de fechas)*
+3. **Exportar PDF** — documento con hoja membretada **DISTRIBUIDORA HORUS** (logo, línea dorada, pie de página).
+4. **CSV ventas** / **CSV utilidades** — exportación para Excel (como antes).
+
+Debes seleccionar al menos una sección para generar el PDF.
 
 ---
 
@@ -294,6 +306,7 @@ Hoy no hay pantalla de usuarios; hay que hacerlo directamente en la base de dato
 | Ver quién vendió | **Ventas** (columna Vendedor) |
 | Ver entradas/salidas de stock | **Movimientos** |
 | Ver reportes y utilidades | **Informes** *(Admin)* |
+| Exportar PDF membretado | **Informes → Exportar informe → PDF** |
 | Ver quién modificó el sistema | **Histórico** *(Admin)* |
 
 ---

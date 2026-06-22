@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const lanIp = process.env.LAN_IP;
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["pdfkit"],
   // Permite acceder desde celular/tablet en la misma red (dev).
   // Agrega tu IP Wi‑Fi en .env: LAN_IP=192.168.1.139
   allowedDevOrigins: [

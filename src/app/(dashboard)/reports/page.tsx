@@ -6,9 +6,9 @@ import {
   getSalesProfitReport,
 } from "@/actions/reports";
 import { ReportsClient } from "@/components/reports/reports-client";
+import { ReportsExportPanel } from "@/components/reports/reports-export-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 
 function defaultDates() {
@@ -58,15 +58,9 @@ export default async function ReportsPage({
         <Button type="submit" className="w-full sm:w-auto">
           Filtrar
         </Button>
-        <Link
-          href={`/api/reports/export?start=${startDate}&end=${endDate}`}
-          className="inline-flex w-full sm:w-auto"
-        >
-          <Button type="button" variant="outline" className="w-full sm:w-auto">
-            Export CSV
-          </Button>
-        </Link>
       </form>
+
+      <ReportsExportPanel startDate={startDate} endDate={endDate} />
 
       <ReportsClient
         chartData={period.chartData}
