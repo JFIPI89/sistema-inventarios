@@ -42,8 +42,22 @@ Abrir [http://localhost:3000](http://localhost:3000)
 ### Opción B — Neon (misma BD que producción)
 
 1. Crear proyecto gratis en [neon.tech](https://neon.tech)
-2. Copiar **pooled** y **direct** connection strings a `.env`
-3. Ejecutar `npm run db:push` y `npm run db:seed`
+2. Copiar **direct** connection string a `.env` (ver `.env.example`)
+3. En local, `DATABASE_URL` y `DIRECT_URL` deben ser la URL **direct** (sin `-pooler`)
+4. En Vercel, `DATABASE_URL` debe ser la URL **pooled** (con `-pooler`)
+5. Ejecutar `npm run db:setup` y `npm run dev`
+
+> **Tip:** Si ves `prisma:error ... Connection Closed` en la terminal con el dev server, estás usando el pooler en local. Cambia a la URL direct.
+
+### Solución de problemas (local)
+
+| Problema | Causa | Solución |
+|----------|-------|----------|
+| `Connection Closed` repetido | URL pooled en `npm run dev` | Usar URL **direct** en `DATABASE_URL` |
+| `auditLog.create` undefined | Cliente Prisma desactualizado | Parar dev → `npx prisma generate` → `npm run dev` |
+| `EPERM` en prisma generate | Dev server bloquea el DLL | Cerrar `npm run dev` antes de generar |
+
+Guía de operación para usuarios finales: **[MANUAL.md](MANUAL.md)**
 
 ### Usuarios demo
 
@@ -103,7 +117,8 @@ npm run db:seed
 
 ### 3. Post-deploy
 
-- Probar login en `https://tu-app.vercel.app/login`
+- App en producción: **https://sistema-inventarios-seven.vercel.app**
+- Probar login en `/login`
 - **Cambiar contraseñas demo** antes de uso real
 
 ### Límites capa free

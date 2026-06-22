@@ -1,41 +1,58 @@
-# Manual de usuario — Horus Inventarios
+# Manual de operación — Horus Inventarios
 
-Guía práctica para operar el sistema: catálogo, entradas de stock, ventas, clientes y proveedores.
+Guía práctica para operar el sistema: catálogo, entradas de stock, ventas, clientes, proveedores, informes y auditoría.
 
 ---
 
 ## 1. Acceso al sistema
 
-| Entorno | URL |
-|---------|-----|
-| En tu PC | http://localhost:3000 |
-| Otro equipo en la misma red Wi‑Fi | http://192.168.1.139:3000 *(usa la IP de tu PC si cambió)* |
+| Entorno | URL | Cuándo usarla |
+|---------|-----|---------------|
+| **Producción (nube)** | https://sistema-inventarios-seven.vercel.app | Desde cualquier lugar con internet |
+| **Local (tu PC)** | http://localhost:3000 | Desarrollo o pruebas en la misma máquina |
+| **Red local (Wi‑Fi)** | http://192.168.1.139:3000 | Celular u otro equipo en la misma red *(IP de tu PC; puede cambiar)* |
+
+### Inicio de sesión
+
+1. Abre la URL del entorno que uses.
+2. Ingresa **email** y **contraseña**.
+3. El menú lateral muestra solo las opciones permitidas para tu rol.
 
 ### Usuarios de prueba (demo)
 
 | Rol | Email | Contraseña | Qué puede hacer |
 |-----|-------|------------|-----------------|
-| **Administrador** | alpha@inventarios.local | alpha123 | Todo |
-| **Administrador** | beta@inventarios.local | beta123 | Todo |
-| **Administrador** | gama@inventarios.local | gama123 | Todo |
+| **Administrador** | alpha@inventarios.local | alpha123 | Todo el sistema |
+| **Administrador** | beta@inventarios.local | beta123 | Todo el sistema |
+| **Administrador** | gama@inventarios.local | gama123 | Todo el sistema |
 | **Almacén** | almacen@inventarios.local | almacen123 | Productos, lotes, proveedores, movimientos, import CSV |
 | **Vendedor** | vendedor@inventarios.local | vendedor123 | Clientes, ventas y punto de venta (POS) |
 
+> **Importante (producción):** cambia estas contraseñas antes de usar el sistema con datos reales. Las credenciales demo están visibles en la pantalla de login.
+
+### Cerrar sesión
+
+Botón **Cerrar sesión** en la parte inferior del menú lateral. El cierre queda registrado en **Histórico** (solo Admin).
+
+### Tema claro / oscuro
+
+Icono de sol/luna en el menú lateral. La preferencia se guarda en el navegador.
+
 ---
 
-## 2. Mapa del menú (dónde está cada cosa)
+## 2. Mapa del menú
 
-| Menú | Ruta | Para qué sirve |
-|------|------|----------------|
-| **Dashboard** | `/` | Resumen: ventas del día, alertas de stock bajo, lotes por vencer |
-| **Productos** | `/products` | Catálogo (SKU, GTIN, precios). **Aquí NO se carga cantidad de inventario** |
-| **Lotes** | `/lots` | **Aquí sí entra el inventario físico** (cantidad por lote) |
-| **Proveedores** | `/suppliers` | Alta y edición de proveedores |
-| **Movimientos** | `/stock/history` | Historial (kardex): entradas, salidas y ajustes |
-| **Clientes** | `/customers` | Alta y edición de clientes |
-| **Ventas** | `/sales` | Historial de ventas |
-| **Informes** | `/reports` | Reportes y exportación CSV *(solo Admin)* |
-| **Histórico** | `/admin/historico` | Auditoría: quién hizo qué y cuándo *(solo Admin)* |
+| Menú | Ruta | Para qué sirve | Roles |
+|------|------|----------------|-------|
+| **Dashboard** | `/` | Ventas del día, alertas stock bajo, lotes por vencer | Todos |
+| **Productos** | `/products` | Catálogo (SKU, GTIN, precios). **No carga cantidad física** | Admin, Almacén |
+| **Lotes** | `/lots` | **Inventario físico** por lote | Admin, Almacén |
+| **Proveedores** | `/suppliers` | Alta y edición de proveedores | Admin, Almacén |
+| **Movimientos** | `/stock/history` | Kardex: entradas, salidas y ajustes | Admin, Almacén |
+| **Clientes** | `/customers` | Alta y edición de clientes | Admin, Vendedor |
+| **Ventas** | `/sales` | Historial de ventas y POS | Admin, Vendedor |
+| **Informes** | `/reports` | Reportes, gráficas y export CSV | Solo Admin |
+| **Histórico** | `/admin/historico` | Auditoría: quién hizo qué y cuándo | Solo Admin |
 
 ---
 
@@ -44,138 +61,135 @@ Guía práctica para operar el sistema: catálogo, entradas de stock, ventas, cl
 | Pantalla | Menú | Qué registra |
 |----------|------|--------------|
 | **Movimientos** | `/stock/history` | Kardex de **stock físico**: entradas (IN), salidas por venta (OUT), ajustes (ADJUST) |
-| **Histórico** | `/admin/historico` | **Auditoría de usuarios**: quién creó o modificó productos, lotes, clientes, ventas, etc. |
+| **Histórico** | `/admin/historico` | **Auditoría de usuarios**: altas, cambios, login, logout, importaciones, cancelaciones |
 
 Ejemplos en **Histórico**:
-- "Almacén Demo recibió 50 pzas en lote LOTE-001"
-- "Vendedor Demo registró venta V-202606-00001"
-- "Administrador inició sesión"
 
-Solo el rol **Administrador** ve el menú Histórico.
+- "Admin Alpha recibió 50 pzas en lote LOTE-001"
+- "Vendedor Demo registró venta V-202606-00001"
+- "Admin Beta inició sesión"
+
+**Histórico** permite filtrar por usuario, acción, tipo de entidad y rango de fechas.
 
 ---
 
-## 3. ¿Qué es el GTIN? (a veces lo llaman “GIN”)
+## 3. ¿Qué es el GTIN?
 
-**GTIN** = *Global Trade Item Number* (estándar **GS1**). Es el código numérico del producto a nivel comercial (el que suele ir en códigos de barras EAN/UPC).
+**GTIN** = *Global Trade Item Number* (estándar **GS1**). Código numérico del producto (EAN/UPC en códigos de barras).
 
-En la app aparece como **“GTIN (AI 01)”** en el formulario de producto.
+En la app: campo **"GTIN (AI 01)"** en producto.
 
 | Detalle | Explicación |
 |---------|-------------|
-| **¿Es obligatorio?** | No. Puedes dejarlo vacío si el producto no tiene código GS1. |
-| **Formato** | 8, 12, 13 o 14 dígitos. El sistema valida el **dígito verificador**. |
-| **Ejemplo demo** | Producto `SKU-001` → GTIN `00012345678905` |
-| **¿Dónde se captura?** | **Productos → Nuevo producto** o **Editar** en un producto existente |
-| **¿Para qué sirve?** | Identificar el producto en POS (búsqueda), import CSV y trazabilidad GS1 |
-| **Diferencia con SKU** | **SKU** = tu código interno (único en tu negocio). **GTIN** = código estándar internacional del artículo |
+| **¿Es obligatorio?** | No |
+| **Formato** | 8, 12, 13 o 14 dígitos con dígito verificador válido |
+| **Ejemplo demo** | `SKU-001` → GTIN `00012345678905` |
+| **¿Dónde se captura?** | **Productos → Nuevo** o **Editar** |
+| **Diferencia con SKU** | **SKU** = código interno. **GTIN** = código estándar internacional |
 
-**Importante:** el GTIN **no suma stock**. Solo describe el producto. La cantidad física se registra en **Lotes**.
+**El GTIN no suma stock.** La cantidad física se registra en **Lotes**.
 
 ---
 
-## 4. Cómo dar de alta inventario (flujo completo)
-
-En este sistema el stock **no** se carga en “Productos”. El flujo correcto es:
+## 4. Flujo de inventario (alta de stock)
 
 ```
-1. Crear el PRODUCTO (catálogo)
+1. Crear PRODUCTO (catálogo)
         ↓
-2. Registrar ENTRADA DE STOCK en un LOTE (cantidad física)
+2. ENTRADA DE STOCK en un LOTE (cantidad física)
         ↓
-3. (Opcional) Recibir más mercancía al mismo lote o ajustar
+3. (Opcional) Recibir más al mismo lote o ajustar
         ↓
-4. La SALIDA ocurre al VENDER en el POS (FIFO automático)
+4. SALIDA automática al VENDER en el POS (FIFO)
 ```
 
-### Paso A — Crear producto (catálogo)
+### Paso A — Crear producto
 
-1. Menú **Productos**
-2. Botón **Nuevo producto**
-3. Completa al menos: **SKU**, **Nombre**, precio costo, precio venta, stock mínimo
-4. Opcional: GTIN, marca, categoría, código de barras
+1. **Productos → Nuevo producto**
+2. Mínimo: **SKU**, **Nombre**, precio costo, precio venta, stock mínimo
+3. Opcional: GTIN, marca, categoría, código de barras
 
-**Atajo:** **Productos → Importar CSV** para cargar muchos productos de una vez (plantilla descargable en esa pantalla).
+**Importación masiva:** **Productos → Importar CSV** — descarga la plantilla, complétala y súbela.
 
-### Paso B — Entrada de stock (inventario físico)
+Columnas de la plantilla CSV: SKU, GTIN, nombre, marca, categoría, unidad, costo, precio venta, stock mínimo, descripción, código de barras.
 
-Tienes **tres formas**:
+### Paso B — Entrada de stock
 
-| Forma | Dónde | Cuándo usarla |
-|-------|-------|---------------|
-| **Nuevo lote** | **Lotes → Entrada de stock** | Llegó mercancía nueva con un número de lote que aún no existe |
-| **Atajo desde producto** | **Productos → Entrada stock** (en la fila) o **Editar producto → Entrada de stock** | Igual que arriba, pero con el producto ya pre-seleccionado |
-| **Recibir en lote existente** | **Lotes → Gestionar** (en un lote) → **Recibir mercancía** | Llegó más cantidad del **mismo** número de lote (misma factura/remisión, mismo batch) |
+| Forma | Dónde | Cuándo |
+|-------|-------|--------|
+| **Nuevo lote** | **Lotes → Entrada de stock** | Mercancía nueva con lote que no existe |
+| **Atajo desde producto** | **Productos → Entrada stock** (fila) o **Editar → Entrada de stock** | Mismo flujo, producto pre-seleccionado |
+| **Recibir en lote existente** | **Lotes → Gestionar → Recibir mercancía** | Más cantidad del **mismo** número de lote |
 
-Campos típicos al dar entrada:
+Campos típicos:
 
-- **Producto** (obligatorio)
-- **Número de lote / Batch (AI 10)** (obligatorio, máx. 20 caracteres)
-- **Cantidad** (obligatorio)
-- **Proveedor** (opcional)
-- **Vencimiento (AI 17)**, ubicación, fechas GS1 (opcionales)
+- **Producto**, **Número de lote (AI 10)**, **Cantidad** (obligatorios)
+- **Proveedor**, vencimiento (AI 17), ubicación, fechas GS1 (opcionales)
 
-Al guardar, el sistema crea un movimiento tipo **IN** (entrada) visible en **Movimientos**.
+Genera movimiento **IN** en **Movimientos**.
 
-### Paso C — Ajustes (correcciones)
+### Paso C — Ajustes
 
-En **Lotes → Gestionar → Ajustar** usa +/- cuando hay mermas, conteos físicos o errores. Eso genera movimiento **ADJUST**, no una venta.
+**Lotes → Gestionar → Ajustar** — correcciones por merma, conteo o error. Movimiento **ADJUST**.
 
 ---
 
-## 5. Dónde dar de alta clientes
+## 5. Clientes
 
-1. Menú **Clientes**
-2. **Nuevo cliente**
-3. Campos principales: **Código** (único), **Nombre**; opcional: email, teléfono, RFC/ID fiscal, dirección
+1. **Clientes → Nuevo cliente**
+2. **Código** (único) y **Nombre** obligatorios; opcional: email, teléfono, RFC, dirección
 
-**Roles que pueden:** Administrador y Vendedor.
+**Roles:** Admin y Vendedor.
 
-En el **Punto de venta (POS)** puedes vender a “Mostrador” (sin cliente) o elegir un cliente del listado.
-
----
-
-## 6. Dónde dar de alta proveedores
-
-1. Menú **Proveedores**
-2. **Nuevo proveedor**
-3. Solo pide **Nombre** (por ahora)
-
-**Roles que pueden:** Administrador y Almacén.
-
-El proveedor se asocia al dar **Entrada de stock** (nuevo lote) en el campo **Proveedor**. También se ve en el listado de **Lotes**.
+En el **POS** puedes vender a "Mostrador" (sin cliente) o elegir uno del listado.
 
 ---
 
-## 7. ¿Se puede asignar inventario de salida a un vendedor?
+## 6. Proveedores
 
-**Sí, pero de forma automática — no hay pantalla para “asignar salida manualmente a otro vendedor”.**
+1. **Proveedores → Nuevo proveedor**
+2. Campo **Nombre** (obligatorio)
 
-| Tipo de salida | Cómo se asigna al vendedor |
-|----------------|----------------------------|
-| **Venta (POS)** | La venta queda registrada con el **usuario que inició sesión** al cobrar. En **Ventas → Detalle** y en el listado verás la columna **Vendedor**. |
-| **Ajuste de lote** | No lleva vendedor; es corrección de almacén. |
-| **Movimiento OUT en kardex** | Referencia el número de venta (`V-YYYYMM-00001`), no un vendedor directo en esa tabla. |
+**Roles:** Admin y Almacén.
 
-**En la práctica:**
-
-- Si el **Vendedor Demo** entra y cobra en **Ventas → Nueva venta (POS)**, esa venta (y la salida de stock FIFO) queda a su nombre.
-- Si entra **Administrador** y vende, queda a nombre del administrador.
-- **Almacén** no tiene acceso al POS; no registra ventas.
-
-**No existe hoy:** elegir otro vendedor en el POS (“vendió Juan pero cobró Pedro”). Si lo necesitas, sería una mejora futura.
+Se asocia al dar **Entrada de stock** en el campo **Proveedor**.
 
 ---
 
-## 8. Punto de venta (salida de inventario por venta)
+## 7. Punto de venta (POS)
 
-1. Menú **Ventas → Nueva venta (POS)**
-2. Busca producto por SKU, nombre o código de barras/GTIN
-3. **Agregar** al carrito (el sistema usa el lote con **FIFO**: primero el que vence antes)
-4. Elige cliente (opcional), descuento, forma de pago
+1. **Ventas → Nueva venta (POS)**
+2. Buscar por SKU, nombre o código de barras/GTIN
+3. **Agregar** al carrito — el sistema aplica **FIFO** (lote que vence primero)
+4. Cliente (opcional), descuento, forma de pago
 5. **Cobrar**
 
-Eso descuenta stock del lote y crea movimiento **OUT** en **Movimientos**.
+Descuenta stock y crea movimiento **OUT** en **Movimientos**.
+
+### Vendedor asignado a la venta
+
+La venta queda a nombre del **usuario que inició sesión** al cobrar. Columna **Vendedor** en **Ventas**.
+
+No existe hoy elegir otro vendedor en el POS ("cobró Pedro pero vendió Juan").
+
+### Anular una venta
+
+**Ventas → Detalle de venta → Anular venta** (si está activa). Revierte el stock a los lotes y registra la cancelación en **Histórico**.
+
+---
+
+## 8. Informes (solo Administrador)
+
+Menú **Informes** (`/reports`):
+
+| Sección | Contenido |
+|---------|-----------|
+| **Ventas por periodo** | Gráfica y totales; filtro por fechas |
+| **Por producto / cliente** | Ranking de unidades e ingresos |
+| **Inventario valorizado** | Stock por lote con valor a costo |
+| **Utilidades** | Ingresos, costo, utilidad y margen por periodo |
+
+**Exportar CSV:** botones de exportación en la misma pantalla (ventas y utilidades).
 
 ---
 
@@ -185,60 +199,115 @@ Menú **Movimientos** (`/stock/history`):
 
 | Tipo | Significado |
 |------|-------------|
-| **IN** | Entrada (nuevo lote o recepción en lote existente) |
+| **IN** | Entrada (nuevo lote o recepción) |
 | **OUT** | Salida por venta |
 | **ADJUST** | Ajuste manual (+/-) |
 
-Filtros: búsqueda, fechas, tipo. Desde **Editar producto** o **Gestionar lote** hay enlaces directos al historial filtrado.
+Filtros: búsqueda, fechas, tipo de movimiento.
 
 ---
 
-## 10. Glosario GS1 (campos que verás)
+## 10. Histórico de auditoría (solo Administrador)
+
+Menú **Histórico** (`/admin/historico`):
+
+Registra acciones de usuarios: crear, editar, eliminar, login, logout, import CSV, cancelar venta.
+
+| Acción | Etiqueta en pantalla |
+|--------|---------------------|
+| CREATE | Alta |
+| UPDATE | Modificación |
+| DELETE | Eliminación |
+| LOGIN | Inicio de sesión |
+| LOGOUT | Cierre de sesión |
+| IMPORT | Importación |
+| CANCEL | Cancelación |
+
+Filtros: búsqueda libre, usuario, acción, tipo de entidad, fechas.
+
+---
+
+## 11. Glosario GS1
 
 | Campo en la app | AI GS1 | Uso |
 |-----------------|--------|-----|
 | GTIN (AI 01) | 01 | Identificador global del producto |
-| Lote / Batch (AI 10) | 10 | Número de lote del fabricante |
+| Lote / Batch (AI 10) | 10 | Número de lote |
 | Fecha producción (AI 11) | 11 | Opcional |
 | Consumir preferente (AI 15) | 15 | Opcional |
 | Vencimiento (AI 17) | 17 | Caducidad del lote |
-| Número de serie (AI 21) | 21 | Opcional, unidad individual |
+| Número de serie (AI 21) | 21 | Unidad individual |
 
 ---
 
-## 11. Preguntas frecuentes
+## 12. Matriz de permisos por rol
+
+| Función | Admin | Almacén | Vendedor |
+|---------|:-----:|:-------:|:--------:|
+| Dashboard | ✓ | ✓ | ✓ |
+| Productos (CRUD) | ✓ | ✓ | — |
+| Importar CSV | ✓ | ✓ | — |
+| Lotes / entradas / ajustes | ✓ | ✓ | — |
+| Proveedores | ✓ | ✓ | — |
+| Movimientos (kardex) | ✓ | ✓ | — |
+| Clientes | ✓ | — | ✓ |
+| Ventas / POS | ✓ | — | ✓ |
+| Anular venta | ✓ | — | ✓ |
+| Informes | ✓ | — | — |
+| Histórico (auditoría) | ✓ | — | — |
+
+---
+
+## 13. Preguntas frecuentes
 
 **¿Por qué mi producto muestra stock 0 si ya lo di de alta?**  
-Probablemente solo creaste el producto en **Productos**. Debes hacer **Entrada de stock** en **Lotes**.
+Solo creaste el catálogo en **Productos**. Falta **Entrada de stock** en **Lotes**.
 
 **¿Puedo usar el mismo número de lote dos veces?**  
-No para el mismo producto. Si llega más mercancía del mismo lote, usa **Recibir mercancía** en ese lote, no crear otro con el mismo número.
+No para el mismo producto. Usa **Recibir mercancía** en el lote existente.
 
-**¿Quién ve qué menús?**  
-- **Vendedor:** Clientes, Ventas (no ve Productos ni Lotes).  
-- **Almacén:** Productos, Lotes, Proveedores, Movimientos (no vende).  
-- **Admin:** todo + Informes.
+**¿Cómo pruebo desde el celular en local?**  
+Misma Wi‑Fi, URL `http://IP_DE_TU_PC:3000`, con `npm run dev` activo en la PC.
 
-**¿Cómo pruebo desde el celular?**  
-Misma Wi‑Fi, URL `http://IP_DE_TU_PC:3000`, y que `npm run dev` esté corriendo en la PC.
+**¿Por qué la primera carga en la nube tarda unos segundos?**  
+Neon (plan free) "despierta" la base tras inactividad. Es normal; la segunda petición suele ser más rápida.
+
+**¿Dónde cambio contraseñas en producción?**  
+Hoy no hay pantalla de usuarios; hay que hacerlo directamente en la base de datos o pedir al administrador técnico. **Prioridad:** cambiar las demo antes de uso real.
 
 ---
 
-## 12. Resumen rápido (cheat sheet)
+## 14. Resumen rápido (cheat sheet)
 
 | Quiero… | Voy a… |
 |---------|--------|
-| Crear un artículo en catálogo | **Productos → Nuevo producto** |
-| Poner GTIN / código GS1 | Campo **GTIN (AI 01)** en producto |
+| Entrar en producción | https://sistema-inventarios-seven.vercel.app/login |
+| Crear artículo en catálogo | **Productos → Nuevo producto** |
+| Cargar muchos productos | **Productos → Importar CSV** |
+| Poner GTIN | Campo **GTIN (AI 01)** en producto |
 | Cargar cantidad al almacén | **Lotes → Entrada de stock** |
-| Sumar más al mismo lote | **Lotes → Gestionar → Recibir mercancía** |
+| Sumar al mismo lote | **Lotes → Gestionar → Recibir mercancía** |
 | Alta de cliente | **Clientes → Nuevo cliente** |
 | Alta de proveedor | **Proveedores → Nuevo proveedor** |
 | Vender y bajar stock | **Ventas → Nueva venta (POS)** |
+| Anular una venta | **Ventas → Detalle → Anular** |
 | Ver quién vendió | **Ventas** (columna Vendedor) |
 | Ver entradas/salidas de stock | **Movimientos** |
-| Ver quién modificó el sistema | **Histórico** *(solo Admin)* |
+| Ver reportes y utilidades | **Informes** *(Admin)* |
+| Ver quién modificó el sistema | **Histórico** *(Admin)* |
 
 ---
 
-*Horus Inventarios — Sistema con trazabilidad por lote (GS1) y ventas FIFO.*
+## 15. Soporte técnico (desarrolladores)
+
+| Recurso | Ubicación |
+|---------|-----------|
+| Guía de despliegue | [DEPLOY.md](DEPLOY.md) |
+| Repositorio | https://github.com/JFIPI89/sistema-inventarios |
+| Panel Vercel | https://vercel.com/juanfcoarmenta89-8094s-projects/sistema-inventarios |
+| Verificar usuarios demo | `npm run verify:users` |
+| Sincronizar BD | `npm run db:setup` |
+
+---
+
+*Horus Inventarios — Trazabilidad por lote (GS1), ventas FIFO y auditoría de operaciones.*
