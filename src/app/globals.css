@@ -44,9 +44,9 @@
   --sidebar-foreground: #f0ede8;
   --sidebar-border: rgba(201, 168, 76, 0.15);
   --sidebar-active: rgba(201, 168, 76, 0.12);
-  --logo-ink: var(--foreground);
-  --logo-detail: var(--muted-foreground);
-  --logo-mid: color-mix(in srgb, var(--foreground) 55%, transparent);
+  --logo-ink: var(--gold-light);
+  --logo-detail: var(--gold);
+  --logo-mid: var(--gold-dim);
   --logo-base: transparent;
 }
 

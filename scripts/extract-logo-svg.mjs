@@ -81,11 +81,14 @@ if (!byRole.ink || !byRole.detail || !byRole.mid || !byRole.base) {
   process.exit(1);
 }
 
+/** Isotipo only: full eagle, excluding bottom text band (validated vs SVG v2 paths). */
+const MARK_HEIGHT = 620;
+
 const libDir = path.join(root, "src", "lib", "brand");
 fs.mkdirSync(libDir, { recursive: true });
 
 const ts = `/** Official DISTRIBUIDORA HORUS logo paths (auto-extracted). */
-export const HORUS_LOGO_VIEWBOX = { full: "0 0 752 800", mark: "0 0 752 480" } as const;
+export const HORUS_LOGO_VIEWBOX = { full: "0 0 752 800", mark: "0 0 752 ${MARK_HEIGHT}" } as const;
 
 export type HorusLogoVariant = keyof typeof HORUS_LOGO_VIEWBOX;
 
