@@ -81,8 +81,8 @@ if (!byRole.ink || !byRole.detail || !byRole.mid || !byRole.base) {
   process.exit(1);
 }
 
-/** Isotipo only: full eagle, excluding bottom text band (validated vs SVG v2 paths). */
-const MARK_HEIGHT = 620;
+/** Isotipo only: full seal graphic; text band starts ~y700+ in v2 artwork. */
+const MARK_HEIGHT = 735;
 
 const libDir = path.join(root, "src", "lib", "brand");
 fs.mkdirSync(libDir, { recursive: true });

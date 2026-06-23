@@ -4,7 +4,9 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { canViewReports } from "@/lib/permissions";
 import type { ReportSection } from "@/lib/reports/sections";
-import { SaleStatus } from "@prisma/client";
+import { SaleStatus, CreditPlanStatus } from "@prisma/client";
+import { syncOverdueInstallments } from "@/actions/credit";
+import { fromCents } from "@/lib/money";
 
 function csvCell(value: string | number | null | undefined): string {
   const s = String(value ?? "");
@@ -127,6 +129,174 @@ export async function getSalesByCustomer(startDate: string, endDate: string) {
   }
 
   return Object.values(map).sort((a, b) => b.total - a.total);
+}
+
+export type CreditReport = {
+  summary: {
+    activePlans: number;
+    totalPortfolioCents: number;
+    totalOutstandingCents: number;
+    collectedInPeriodCents: number;
+    paymentsInPeriodCount: number;
+    overdueInstallmentsCount: number;
+    overdueAmountCents: number;
+    newPlansInPeriod: number;
+    newPlansAmountCents: number;
+  };
+  byCustomer: Array<{
+    customerId: string;
+    name: string;
+    code: string;
+    activePlans: number;
+    outstandingCents: number;
+    overdueCents: number;
+  }>;
+  overdueInstallments: Array<{
+    planId: string;
+    planNumber: string;
+    customerName: string;
+    customerCode: string;
+    installmentNumber: number;
+    dueDate: Date;
+    amountCents: number;
+    paidCents: number;
+    remainingCents: number;
+  }>;
+  paymentsInPeriod: Array<{
+    paidAt: Date;
+    planNumber: string;
+    customerName: string;
+    installmentNumber: number;
+    amountCents: number;
+    paymentMethod: string;
+    userName: string;
+  }>;
+};
+
+export async function getCreditReport(startDate: string, endDate: string): Promise<CreditReport> {
+  await requireReports();
+  await syncOverdueInstallments();
+
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
+
+  const [activePlans, payments, newPlansInPeriod] = await Promise.all([
+    prisma.creditPlan.findMany({
+      where: { status: CreditPlanStatus.ACTIVE },
+      include: {
+        customer: true,
+        installments: true,
+      },
+    }),
+    prisma.creditPayment.findMany({
+      where: { paidAt: { gte: start, lte: end } },
+      include: {
+        user: { select: { name: true } },
+        installment: {
+          include: {
+            creditPlan: { include: { customer: true } },
+          },
+        },
+      },
+      orderBy: { paidAt: "desc" },
+    }),
+    prisma.creditPlan.findMany({
+      where: { createdAt: { gte: start, lte: end } },
+      select: { totalCents: true },
+    }),
+  ]);
+
+  let totalPortfolioCents = 0;
+  let totalOutstandingCents = 0;
+  let overdueInstallmentsCount = 0;
+  let overdueAmountCents = 0;
+
+  const customerMap = new Map<
+    string,
+    { name: string; code: string; activePlans: number; outstandingCents: number; overdueCents: number }
+  >();
+
+  const overdueInstallments: CreditReport["overdueInstallments"] = [];
+
+  for (const plan of activePlans) {
+    totalPortfolioCents += plan.totalCents;
+    let planOutstanding = 0;
+    let planOverdue = 0;
+
+    for (const inst of plan.installments) {
+      const remaining = Math.max(0, inst.amountCents - inst.paidCents);
+      planOutstanding += remaining;
+      if (inst.status === "OVERDUE" && remaining > 0) {
+        overdueInstallmentsCount += 1;
+        overdueAmountCents += remaining;
+        planOverdue += remaining;
+        overdueInstallments.push({
+          planId: plan.id,
+          planNumber: plan.planNumber,
+          customerName: plan.customer.name,
+          customerCode: plan.customer.code,
+          installmentNumber: inst.number,
+          dueDate: inst.dueDate,
+          amountCents: inst.amountCents,
+          paidCents: inst.paidCents,
+          remainingCents: remaining,
+        });
+      }
+    }
+
+    totalOutstandingCents += planOutstanding;
+
+    const key = plan.customerId;
+    const existing = customerMap.get(key);
+    if (existing) {
+      existing.activePlans += 1;
+      existing.outstandingCents += planOutstanding;
+      existing.overdueCents += planOverdue;
+    } else {
+      customerMap.set(key, {
+        name: plan.customer.name,
+        code: plan.customer.code,
+        activePlans: 1,
+        outstandingCents: planOutstanding,
+        overdueCents: planOverdue,
+      });
+    }
+  }
+
+  overdueInstallments.sort(
+    (a, b) => a.dueDate.getTime() - b.dueDate.getTime()
+  );
+
+  const collectedInPeriodCents = payments.reduce((s, p) => s + p.amountCents, 0);
+  const newPlansAmountCents = newPlansInPeriod.reduce((s, p) => s + p.totalCents, 0);
+
+  return {
+    summary: {
+      activePlans: activePlans.length,
+      totalPortfolioCents,
+      totalOutstandingCents,
+      collectedInPeriodCents,
+      paymentsInPeriodCount: payments.length,
+      overdueInstallmentsCount,
+      overdueAmountCents,
+      newPlansInPeriod: newPlansInPeriod.length,
+      newPlansAmountCents,
+    },
+    byCustomer: Array.from(customerMap.entries())
+      .map(([customerId, row]) => ({ customerId, ...row }))
+      .sort((a, b) => b.outstandingCents - a.outstandingCents),
+    overdueInstallments,
+    paymentsInPeriod: payments.map((p) => ({
+      paidAt: p.paidAt,
+      planNumber: p.installment.creditPlan.planNumber,
+      customerName: p.installment.creditPlan.customer.name,
+      installmentNumber: p.installment.number,
+      amountCents: p.amountCents,
+      paymentMethod: p.paymentMethod,
+      userName: p.user.name,
+    })),
+  };
 }
 
 export async function getInventoryValuation() {
@@ -336,6 +506,64 @@ export async function exportReportCsv(
       ...rows,
       "",
       csvRow(["Total inventario", "", "", "", "", "", total])
+    );
+  }
+
+  if (sections.includes("credit")) {
+    const credit = await getCreditReport(startDate, endDate);
+    const s = credit.summary;
+    blocks.push(
+      `=== Cartera / Crédito (${startDate} — ${endDate}) ===`,
+      "Resumen,Valor",
+      csvRow(["Planes activos", s.activePlans]),
+      csvRow(["Cartera activa total", fromCents(s.totalPortfolioCents)]),
+      csvRow(["Saldo pendiente (snapshot)", fromCents(s.totalOutstandingCents)]),
+      csvRow(["Cobrado en período", fromCents(s.collectedInPeriodCents)]),
+      csvRow(["Abonos en período", s.paymentsInPeriodCount]),
+      csvRow(["Cuotas vencidas", s.overdueInstallmentsCount]),
+      csvRow(["Monto vencido", fromCents(s.overdueAmountCents)]),
+      csvRow(["Nuevos planes en período", s.newPlansInPeriod]),
+      csvRow(["Monto nuevos planes", fromCents(s.newPlansAmountCents)]),
+      "",
+      "=== Saldo por cliente (activos) ===",
+      "Cliente,Codigo,Planes activos,Saldo pendiente,Vencido",
+      ...credit.byCustomer.map((c) =>
+        csvRow([
+          c.name,
+          c.code,
+          c.activePlans,
+          fromCents(c.outstandingCents),
+          fromCents(c.overdueCents),
+        ])
+      ),
+      "",
+      "=== Cuotas vencidas ===",
+      "Plan,Cliente,Cuota,Vencimiento,Monto,Abonado,Saldo",
+      ...credit.overdueInstallments.map((i) =>
+        csvRow([
+          i.planNumber,
+          i.customerName,
+          i.installmentNumber,
+          i.dueDate.toISOString().slice(0, 10),
+          fromCents(i.amountCents),
+          fromCents(i.paidCents),
+          fromCents(i.remainingCents),
+        ])
+      ),
+      "",
+      `=== Abonos del período (${startDate} — ${endDate}) ===`,
+      "Fecha,Plan,Cliente,Cuota,Monto,Metodo,Usuario",
+      ...credit.paymentsInPeriod.map((p) =>
+        csvRow([
+          p.paidAt.toISOString(),
+          p.planNumber,
+          p.customerName,
+          p.installmentNumber,
+          fromCents(p.amountCents),
+          p.paymentMethod,
+          p.userName,
+        ])
+      )
     );
   }
 

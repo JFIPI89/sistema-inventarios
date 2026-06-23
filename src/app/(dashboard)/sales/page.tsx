@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { SALE_TYPE_LABELS } from "@/lib/credit-labels";
 import { Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/layout/page-header";
@@ -49,6 +50,7 @@ export default async function SalesPage({
               <TableHead>Fecha</TableHead>
               <TableHead>Cliente</TableHead>
               <TableHead>Vendedor</TableHead>
+              <TableHead>Tipo</TableHead>
               <TableHead>Total</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead></TableHead>
@@ -61,6 +63,11 @@ export default async function SalesPage({
                 <TableCell>{formatDate(sale.saleDate)}</TableCell>
                 <TableCell>{sale.customer?.name || "Mostrador"}</TableCell>
                 <TableCell>{sale.user.name}</TableCell>
+                <TableCell>
+                  <Badge variant={sale.saleType === "CREDITO" ? "default" : "secondary"}>
+                    {SALE_TYPE_LABELS[sale.saleType]}
+                  </Badge>
+                </TableCell>
                 <TableCell>{formatCurrency(sale.total)}</TableCell>
                 <TableCell>
                   <Badge variant={sale.status === "COMPLETED" ? "success" : "destructive"}>

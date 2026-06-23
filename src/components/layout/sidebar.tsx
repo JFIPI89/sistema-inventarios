@@ -14,6 +14,7 @@ import {
   History,
   ScrollText,
   Tags,
+  Wallet,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ const navItems = [
   { href: "/stock/history", label: "Movimientos", icon: History, resource: "stock" as const },
   { href: "/customers", label: "Clientes", icon: Users, resource: "customers" as const },
   { href: "/sales", label: "Ventas", icon: ShoppingCart, resource: "sales" as const },
+  { href: "/credit", label: "Cartera", icon: Wallet, resource: "sales" as const },
   { href: "/reports", label: "Informes", icon: BarChart3, resource: "reports" as const },
   { href: "/admin/historico", label: "Histórico", icon: ScrollText, resource: "audit" as const },
 ];
@@ -76,7 +78,7 @@ export function Sidebar({
         className="flex items-start justify-between border-b p-4 sm:p-6"
         style={{ borderColor: "var(--sidebar-border)" }}
       >
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 overflow-visible">
           <HorusLogo size="md" />
           <p className="mt-3 truncate font-space-mono text-[10px] tracking-wide text-muted-foreground">
             {userName}

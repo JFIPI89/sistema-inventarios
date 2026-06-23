@@ -22,7 +22,7 @@ export function HorusLogo({
       href="/"
       aria-label="Ir al inicio — Distribuidora Horus"
       className={cn(
-        "inline-flex shrink-0 items-center rounded-md transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)] focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        "inline-flex shrink-0 items-center overflow-visible rounded-md transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)] focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         className
       )}
     >

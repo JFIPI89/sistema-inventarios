@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { SALE_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/credit-labels";
 import { CancelSaleButton } from "@/components/sales/cancel-sale-button";
 import { PageHeader } from "@/components/layout/page-header";
 
@@ -49,8 +50,23 @@ export default async function SaleDetailPage({
             <span className="text-muted-foreground">Vendedor:</span> {sale.user.name}
           </p>
           <p>
-            <span className="text-muted-foreground">Pago:</span> {sale.paymentMethod}
+            <span className="text-muted-foreground">Tipo:</span>{" "}
+            <Badge variant={sale.saleType === "CREDITO" ? "default" : "secondary"}>
+              {SALE_TYPE_LABELS[sale.saleType]}
+            </Badge>
           </p>
+          <p>
+            <span className="text-muted-foreground">Pago:</span>{" "}
+            {PAYMENT_METHOD_LABELS[sale.paymentMethod]}
+          </p>
+          {sale.creditPlan && (
+            <p>
+              <span className="text-muted-foreground">Cartera:</span>{" "}
+              <Link href={`/credit/${sale.creditPlan.id}`} className="text-primary hover:underline">
+                {sale.creditPlan.planNumber}
+              </Link>
+            </p>
+          )}
         </CardContent>
       </Card>
 

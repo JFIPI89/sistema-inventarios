@@ -10,8 +10,8 @@ import { FRONTEND_LOGO_FILLS } from "@/lib/brand/build-horus-logo-svg";
 import { cn } from "@/lib/utils";
 
 const heights = {
-  sm: "h-11",
-  md: "h-12",
+  sm: "h-12",
+  md: "h-14",
   lg: "h-36",
 } as const;
 
@@ -31,7 +31,8 @@ export function HorusLogoSvg({
       viewBox={viewBox}
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden
-      className={cn("w-auto shrink-0", heights[size], className)}
+      preserveAspectRatio="xMidYMid meet"
+      className={cn("block w-auto shrink-0 overflow-visible", heights[size], className)}
     >
       <path d={pathBase} fill={FRONTEND_LOGO_FILLS.base} />
       <path d={pathDetail} fill={FRONTEND_LOGO_FILLS.detail} />

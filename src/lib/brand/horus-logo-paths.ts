@@ -1,5 +1,5 @@
 /** Official DISTRIBUIDORA HORUS logo paths (auto-extracted). */
-export const HORUS_LOGO_VIEWBOX = { full: "0 0 752 800", mark: "0 0 752 620" } as const;
+export const HORUS_LOGO_VIEWBOX = { full: "0 0 752 800", mark: "0 0 752 735" } as const;
 
 export type HorusLogoVariant = keyof typeof HORUS_LOGO_VIEWBOX;
 

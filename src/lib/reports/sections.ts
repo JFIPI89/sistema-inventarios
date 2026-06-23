@@ -3,7 +3,8 @@ export type ReportSection =
   | "products"
   | "customers"
   | "profit"
-  | "inventory";
+  | "inventory"
+  | "credit";
 
 export const VALID_SECTIONS: ReportSection[] = [
   "sales",
@@ -11,6 +12,7 @@ export const VALID_SECTIONS: ReportSection[] = [
   "customers",
   "profit",
   "inventory",
+  "credit",
 ];
 
 export function parseSections(param: string): ReportSection[] {

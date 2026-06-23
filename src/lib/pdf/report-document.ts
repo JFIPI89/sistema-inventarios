@@ -53,6 +53,41 @@ export type ReportPdfData = {
     quantity: number;
     value: number;
   }>;
+  credit?: {
+    summary: {
+      activePlans: number;
+      totalPortfolioCents: number;
+      totalOutstandingCents: number;
+      collectedInPeriodCents: number;
+      paymentsInPeriodCount: number;
+      overdueInstallmentsCount: number;
+      overdueAmountCents: number;
+      newPlansInPeriod: number;
+      newPlansAmountCents: number;
+    };
+    byCustomer: Array<{
+      name: string;
+      code: string;
+      activePlans: number;
+      outstandingCents: number;
+      overdueCents: number;
+    }>;
+    overdueInstallments: Array<{
+      planNumber: string;
+      customerName: string;
+      installmentNumber: number;
+      dueDate: string;
+      remainingCents: number;
+    }>;
+    paymentsInPeriod: Array<{
+      paidAt: string;
+      planNumber: string;
+      customerName: string;
+      installmentNumber: number;
+      amountCents: number;
+      paymentMethod: string;
+    }>;
+  };
 };
 
 type ReportCtx = {
@@ -69,8 +104,12 @@ function money(n: number): string {
   }).format(n);
 }
 
+function moneyCents(cents: number): string {
+  return money(cents / 100);
+}
+
 function logoWidth(height: number, variant: "full" | "mark"): number {
-  const aspect = variant === "full" ? 752 / 800 : 752 / 620;
+  const aspect = variant === "full" ? 752 / 800 : 752 / 735;
   return height * aspect;
 }
 
@@ -280,6 +319,64 @@ export async function buildReportPdf(data: ReportPdfData): Promise<Buffer> {
         [160, 100, 50, 90],
         ctx
       );
+    }
+
+    if (data.sections.includes("credit") && data.credit) {
+      drawSectionTitle(doc, "Cartera / crédito");
+      const s = data.credit.summary;
+      doc.fontSize(9).text(
+        `Cartera activa: ${moneyCents(s.totalPortfolioCents)} (${s.activePlans} planes)  |  Pendiente: ${moneyCents(s.totalOutstandingCents)}  |  Cobrado período: ${moneyCents(s.collectedInPeriodCents)}  |  Vencido: ${moneyCents(s.overdueAmountCents)} (${s.overdueInstallmentsCount} cuotas)`
+      );
+      doc.moveDown(0.4);
+
+      drawSectionTitle(doc, "Saldo por cliente");
+      drawTable(
+        doc,
+        ["Cliente", "Código", "Planes", "Pendiente", "Vencido"],
+        data.credit.byCustomer.slice(0, 40).map((c) => [
+          c.name.slice(0, 22),
+          c.code,
+          String(c.activePlans),
+          moneyCents(c.outstandingCents),
+          c.overdueCents > 0 ? moneyCents(c.overdueCents) : "—",
+        ]),
+        [120, 60, 45, 75, 75],
+        ctx
+      );
+
+      if (data.credit.overdueInstallments.length > 0) {
+        drawSectionTitle(doc, "Cuotas vencidas");
+        drawTable(
+          doc,
+          ["Plan", "Cliente", "Cuota", "Vence", "Saldo"],
+          data.credit.overdueInstallments.slice(0, 40).map((i) => [
+            i.planNumber,
+            i.customerName.slice(0, 18),
+            String(i.installmentNumber),
+            i.dueDate.slice(0, 10),
+            moneyCents(i.remainingCents),
+          ]),
+          [80, 120, 40, 70, 70],
+          ctx
+        );
+      }
+
+      if (data.credit.paymentsInPeriod.length > 0) {
+        drawSectionTitle(doc, "Abonos del período");
+        drawTable(
+          doc,
+          ["Fecha", "Plan", "Cliente", "Cuota", "Monto"],
+          data.credit.paymentsInPeriod.slice(0, 50).map((p) => [
+            p.paidAt.slice(0, 10),
+            p.planNumber,
+            p.customerName.slice(0, 18),
+            String(p.installmentNumber),
+            moneyCents(p.amountCents),
+          ]),
+          [70, 80, 120, 40, 70],
+          ctx
+        );
+      }
     }
 
     const range = doc.bufferedPageRange();

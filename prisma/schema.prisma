@@ -32,6 +32,29 @@ enum PaymentMethod {
   OTHER
 }
 
+enum SaleType {
+  CONTADO
+  CREDITO
+}
+
+enum CreditPeriodUnit {
+  WEEKS
+  MONTHS
+}
+
+enum CreditPlanStatus {
+  ACTIVE
+  PAID
+  CANCELLED
+}
+
+enum CreditInstallmentStatus {
+  PENDING
+  PARTIAL
+  PAID
+  OVERDUE
+}
+
 enum AuditAction {
   CREATE
   UPDATE
@@ -43,14 +66,16 @@ enum AuditAction {
 }
 
 model User {
-  id           String     @id @default(cuid())
-  email        String     @unique
+  id           String       @id @default(cuid())
+  email        String       @unique
   passwordHash String
   name         String
-  role         Role       @default(SELLER)
-  createdAt    DateTime   @default(now())
+  role         Role         @default(SELLER)
+  createdAt    DateTime     @default(now())
   sales        Sale[]
   auditLogs    AuditLog[]
+  creditPlans  CreditPlan[]
+  creditPayments CreditPayment[]
 }
 
 model Category {
@@ -111,17 +136,18 @@ model Lot {
 }
 
 model Customer {
-  id        String   @id @default(cuid())
-  code      String   @unique
-  name      String
-  email     String?
-  phone     String?
-  taxId     String?
-  address   String?
-  notes     String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  sales     Sale[]
+  id          String       @id @default(cuid())
+  code        String       @unique
+  name        String
+  email       String?
+  phone       String?
+  taxId       String?
+  address     String?
+  notes       String?
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  sales       Sale[]
+  creditPlans CreditPlan[]
 }
 
 model Sale {
@@ -136,9 +162,11 @@ model Sale {
   tax           Float         @default(0)
   discount      Float         @default(0)
   total         Float
+  saleType      SaleType      @default(CONTADO)
   paymentMethod PaymentMethod @default(CASH)
   status        SaleStatus    @default(COMPLETED)
   items         SaleItem[]
+  creditPlan    CreditPlan?
   createdAt     DateTime      @default(now())
 }
 
@@ -185,4 +213,56 @@ model AuditLog {
   @@index([createdAt(sort: Desc)])
   @@index([userId])
   @@index([entityType, entityId])
+}
+
+model CreditPlan {
+  id               String            @id @default(cuid())
+  planNumber       String            @unique
+  customerId       String
+  customer         Customer          @relation(fields: [customerId], references: [id])
+  saleId           String?           @unique
+  sale             Sale?             @relation(fields: [saleId], references: [id])
+  createdById      String
+  createdBy        User              @relation(fields: [createdById], references: [id])
+  totalCents       Int
+  installmentCount Int
+  periodUnit       CreditPeriodUnit
+  startDate        DateTime
+  status           CreditPlanStatus  @default(ACTIVE)
+  notes            String?
+  installments     CreditInstallment[]
+  createdAt        DateTime          @default(now())
+
+  @@index([customerId])
+  @@index([status])
+}
+
+model CreditInstallment {
+  id           String                  @id @default(cuid())
+  creditPlanId String
+  creditPlan   CreditPlan              @relation(fields: [creditPlanId], references: [id], onDelete: Cascade)
+  number       Int
+  dueDate      DateTime
+  amountCents  Int
+  paidCents    Int                     @default(0)
+  status       CreditInstallmentStatus @default(PENDING)
+  payments     CreditPayment[]
+
+  @@unique([creditPlanId, number])
+  @@index([dueDate])
+  @@index([status])
+}
+
+model CreditPayment {
+  id            String        @id @default(cuid())
+  installmentId String
+  installment   CreditInstallment @relation(fields: [installmentId], references: [id], onDelete: Cascade)
+  amountCents   Int
+  paymentMethod PaymentMethod
+  paidAt        DateTime      @default(now())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  notes         String?
+
+  @@index([paidAt])
 }

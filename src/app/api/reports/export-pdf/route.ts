@@ -5,6 +5,7 @@ import {
   getSalesByCustomer,
   getInventoryValuation,
   getSalesProfitReport,
+  getCreditReport,
 } from "@/actions/reports";
 import { buildReportPdf, type ReportPdfData } from "@/lib/pdf/report-document";
 import { parseSections } from "@/lib/reports/sections";
@@ -63,6 +64,35 @@ export async function GET(request: NextRequest) {
         quantity: i.quantity,
         value: i.value,
       }));
+    }
+
+    if (sections.includes("credit")) {
+      const credit = await getCreditReport(start, end);
+      pdfData.credit = {
+        summary: credit.summary,
+        byCustomer: credit.byCustomer.map((c) => ({
+          name: c.name,
+          code: c.code,
+          activePlans: c.activePlans,
+          outstandingCents: c.outstandingCents,
+          overdueCents: c.overdueCents,
+        })),
+        overdueInstallments: credit.overdueInstallments.map((i) => ({
+          planNumber: i.planNumber,
+          customerName: i.customerName,
+          installmentNumber: i.installmentNumber,
+          dueDate: i.dueDate.toISOString(),
+          remainingCents: i.remainingCents,
+        })),
+        paymentsInPeriod: credit.paymentsInPeriod.map((p) => ({
+          paidAt: p.paidAt.toISOString(),
+          planNumber: p.planNumber,
+          customerName: p.customerName,
+          installmentNumber: p.installmentNumber,
+          amountCents: p.amountCents,
+          paymentMethod: p.paymentMethod,
+        })),
+      };
     }
 
     const buffer = await buildReportPdf(pdfData);

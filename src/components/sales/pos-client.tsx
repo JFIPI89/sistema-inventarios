@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { searchProductsForSale, createSale, type CartItem } from "@/actions/sales";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/lib/utils";
-import { PaymentMethod } from "@prisma/client";
+import { formatCurrency, formatDate } from "@/lib/utils";
+import { buildInstallmentPreview, formatCents, toCents } from "@/lib/money";
+import { CreditPeriodUnit, PaymentMethod, SaleType } from "@prisma/client";
 import { Trash2 } from "lucide-react";
 
 type Customer = { id: string; code: string; name: string };
@@ -21,7 +22,11 @@ export function PosClient({ customers }: { customers: Customer[] }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerId, setCustomerId] = useState("");
   const [discount, setDiscount] = useState(0);
+  const [saleType, setSaleType] = useState<SaleType>(SaleType.CONTADO);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
+  const [installmentCount, setInstallmentCount] = useState(4);
+  const [periodUnit, setPeriodUnit] = useState<CreditPeriodUnit>(CreditPeriodUnit.WEEKS);
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -70,21 +75,40 @@ export function PosClient({ customers }: { customers: Customer[] }) {
 
   const subtotal = cart.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
   const total = Math.max(0, subtotal - discount);
+  const totalCents = toCents(total);
+
+  const preview = useMemo(() => {
+    if (saleType !== SaleType.CREDITO || totalCents <= 0) return [];
+    const start = new Date(startDate + "T12:00:00");
+    if (Number.isNaN(start.getTime())) return [];
+    return buildInstallmentPreview(totalCents, installmentCount, periodUnit, start);
+  }, [saleType, totalCents, installmentCount, periodUnit, startDate]);
 
   function handleCheckout() {
+    if (saleType === SaleType.CREDITO && !customerId) {
+      setMessage("Seleccione un cliente para venta a crédito");
+      return;
+    }
+
     startTransition(async () => {
       const result = await createSale({
         customerId: customerId || undefined,
+        saleType,
         paymentMethod,
         discount,
         items: cart,
+        ...(saleType === SaleType.CREDITO
+          ? { installmentCount, periodUnit, startDate }
+          : {}),
       });
       if (result.error) {
         setMessage(result.error);
       } else {
         setCart([]);
         setDiscount(0);
-        setMessage(`Venta ${result.saleNumber} registrada`);
+        const extra =
+          result.creditPlanNumber ? ` — Cartera ${result.creditPlanNumber}` : "";
+        setMessage(`Venta ${result.saleNumber} registrada${extra}`);
       }
     });
   }
@@ -181,19 +205,21 @@ export function PosClient({ customers }: { customers: Customer[] }) {
             </ul>
           )}
 
-          <div className="grid gap-2 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Tipo de venta</Label>
+            <select
+              value={saleType}
+              onChange={(e) => setSaleType(e.target.value as SaleType)}
+              className="flex h-10 w-full rounded-md border border-border bg-surface px-3 text-sm"
+            >
+              <option value={SaleType.CONTADO}>Contado</option>
+              <option value={SaleType.CREDITO}>Crédito</option>
+            </select>
+          </div>
+
+          {saleType === SaleType.CONTADO ? (
             <div className="space-y-2">
-              <Label>Descuento</Label>
-              <Input
-                type="number"
-                min={0}
-                step="0.01"
-                value={discount}
-                onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Pago</Label>
+              <Label>Método de pago</Label>
               <select
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
@@ -205,6 +231,64 @@ export function PosClient({ customers }: { customers: Customer[] }) {
                 <option value="OTHER">Otro</option>
               </select>
             </div>
+          ) : (
+            <div className="space-y-3 rounded-md border border-border p-3">
+              <p className="text-sm font-medium">Plan de cuotas (sin interés)</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Cuotas (n)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={52}
+                    value={installmentCount}
+                    onChange={(e) => setInstallmentCount(parseInt(e.target.value, 10) || 1)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Periodicidad</Label>
+                  <select
+                    value={periodUnit}
+                    onChange={(e) => setPeriodUnit(e.target.value as CreditPeriodUnit)}
+                    className="flex h-10 w-full rounded-md border border-border bg-surface px-3 text-sm"
+                  >
+                    <option value={CreditPeriodUnit.WEEKS}>Semanas</option>
+                    <option value={CreditPeriodUnit.MONTHS}>Meses</option>
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Primera cuota</Label>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              </div>
+              {preview.length > 0 && (
+                <ul className="max-h-40 space-y-1 overflow-auto text-xs text-muted-foreground">
+                  {preview.map((row) => (
+                    <li key={row.number} className="flex justify-between gap-2">
+                      <span>
+                        Cuota {row.number} — {formatDate(row.dueDate)}
+                      </span>
+                      <span>{formatCents(row.amountCents)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label>Descuento</Label>
+            <Input
+              type="number"
+              min={0}
+              step="0.01"
+              value={discount}
+              onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+            />
           </div>
 
           <div className="space-y-1 border-t border-border pt-4">
@@ -225,7 +309,7 @@ export function PosClient({ customers }: { customers: Customer[] }) {
           )}
 
           <Button className="w-full" disabled={cart.length === 0 || isPending} onClick={handleCheckout}>
-            {isPending ? "Procesando..." : "Cobrar"}
+            {isPending ? "Procesando..." : saleType === SaleType.CREDITO ? "Registrar crédito" : "Cobrar"}
           </Button>
         </CardContent>
       </Card>

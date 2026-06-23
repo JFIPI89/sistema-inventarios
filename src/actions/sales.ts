@@ -4,8 +4,10 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { canWriteSales } from "@/lib/permissions";
-import { PaymentMethod, SaleStatus, StockMovementType } from "@prisma/client";
+import { PaymentMethod, SaleStatus, SaleType, StockMovementType, CreditPeriodUnit } from "@prisma/client";
 import { buildChanges, logAudit } from "@/lib/audit";
+import { createCreditPlanInTx } from "@/actions/credit";
+import { toCents } from "@/lib/money";
 
 async function requireSalesWrite() {
   const session = await getSession();
@@ -154,13 +156,26 @@ async function generateSaleNumber() {
 
 export async function createSale(data: {
   customerId?: string;
+  saleType: SaleType;
   paymentMethod: PaymentMethod;
   discount: number;
   items: CartItem[];
+  installmentCount?: number;
+  periodUnit?: CreditPeriodUnit;
+  startDate?: string;
 }) {
   const session = await requireSalesWrite();
 
   if (!data.items.length) return { error: "El carrito está vacío" };
+
+  if (data.saleType === SaleType.CREDITO) {
+    if (!data.customerId) return { error: "Seleccione un cliente para venta a crédito" };
+    if (!data.installmentCount || data.installmentCount < 1 || data.installmentCount > 52) {
+      return { error: "Indique cantidad de cuotas (1–52)" };
+    }
+    if (!data.periodUnit) return { error: "Indique semanas o meses" };
+    if (!data.startDate) return { error: "Indique fecha de primera cuota" };
+  }
 
   const saleNumber = await generateSaleNumber();
   let subtotal = 0;
@@ -171,6 +186,17 @@ export async function createSale(data: {
 
   const discount = data.discount || 0;
   const total = Math.max(0, subtotal - discount);
+  const totalCents = toCents(total);
+  const creditStartDate = data.startDate ? new Date(data.startDate) : new Date();
+
+  if (data.saleType === SaleType.CREDITO && totalCents <= 0) {
+    return { error: "El total debe ser mayor a cero para crédito" };
+  }
+  if (data.saleType === SaleType.CREDITO && Number.isNaN(creditStartDate.getTime())) {
+    return { error: "Fecha de primera cuota inválida" };
+  }
+
+  let creditPlanNumber: string | undefined;
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -182,7 +208,9 @@ export async function createSale(data: {
           subtotal,
           discount,
           total,
-          paymentMethod: data.paymentMethod,
+          saleType: data.saleType,
+          paymentMethod:
+            data.saleType === SaleType.CREDITO ? PaymentMethod.OTHER : data.paymentMethod,
           status: SaleStatus.COMPLETED,
         },
       });
@@ -219,12 +247,28 @@ export async function createSale(data: {
           },
         });
       }
+
+      if (data.saleType === SaleType.CREDITO && data.customerId) {
+        const plan = await createCreditPlanInTx(tx, {
+          customerId: data.customerId,
+          totalCents,
+          installmentCount: data.installmentCount!,
+          periodUnit: data.periodUnit!,
+          startDate: creditStartDate,
+          saleId: sale.id,
+          createdById: session.id,
+        });
+        creditPlanNumber = plan.planNumber;
+      }
     });
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Error al registrar venta" };
   }
 
-  const saleRecord = await prisma.sale.findUnique({ where: { saleNumber } });
+  const saleRecord = await prisma.sale.findUnique({
+    where: { saleNumber },
+    include: { creditPlan: true },
+  });
 
   await logAudit({
     session,
@@ -232,7 +276,10 @@ export async function createSale(data: {
     entityType: "Sale",
     entityId: saleRecord?.id,
     entityLabel: saleNumber,
-    summary: `Venta ${saleNumber} por ${total.toFixed(2)} (${data.items.length} ítems)`,
+    summary:
+      data.saleType === SaleType.CREDITO
+        ? `Venta a crédito ${saleNumber} por ${total.toFixed(2)} — plan ${creditPlanNumber}`
+        : `Venta ${saleNumber} por ${total.toFixed(2)} (${data.items.length} ítems)`,
     changes: {
       items: data.items.map((i) => ({
         product: i.productName,
@@ -241,15 +288,19 @@ export async function createSale(data: {
         price: i.unitPrice,
       })),
       discount,
+      saleType: data.saleType,
       paymentMethod: data.paymentMethod,
+      creditPlanNumber,
     },
   });
 
   revalidatePath("/sales");
+  revalidatePath("/credit");
   revalidatePath("/lots");
   revalidatePath("/");
   revalidatePath("/reports");
-  return { success: true, saleNumber };
+  if (data.customerId) revalidatePath(`/customers/${data.customerId}`);
+  return { success: true, saleNumber, creditPlanNumber };
 }
 
 export async function getSales(search?: string) {
@@ -266,6 +317,7 @@ export async function getSales(search?: string) {
       customer: true,
       user: { select: { name: true } },
       items: { include: { product: true, lot: true } },
+      creditPlan: { select: { id: true, planNumber: true } },
     },
     orderBy: { saleDate: "desc" },
     take: 100,
@@ -279,6 +331,7 @@ export async function getSale(id: string) {
       customer: true,
       user: { select: { name: true, email: true } },
       items: { include: { product: true, lot: true } },
+      creditPlan: { select: { id: true, planNumber: true, status: true } },
     },
   });
 }

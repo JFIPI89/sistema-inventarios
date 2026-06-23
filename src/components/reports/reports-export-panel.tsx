@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
-const SECTIONS = [
+const OPERATIONS_SECTIONS = [
   { id: "sales", label: "Ventas del período" },
   { id: "products", label: "Top productos" },
   { id: "customers", label: "Top clientes" },
@@ -11,17 +11,27 @@ const SECTIONS = [
   { id: "inventory", label: "Inventario valorizado (snapshot)" },
 ] as const;
 
+const CREDIT_SECTIONS = [{ id: "credit", label: "Cartera / crédito" }] as const;
+
 export function ReportsExportPanel({
   startDate,
   endDate,
+  activeTab = "operaciones",
 }: {
   startDate: string;
   endDate: string;
+  activeTab?: "operaciones" | "cartera";
 }) {
-  const [selected, setSelected] = useState<string[]>(
-    SECTIONS.map((s) => s.id)
-  );
+  const sections =
+    activeTab === "cartera" ? [...CREDIT_SECTIONS] : [...OPERATIONS_SECTIONS];
+
+  const [selected, setSelected] = useState<string[]>(sections.map((s) => s.id));
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelected(sections.map((s) => s.id));
+    setError(null);
+  }, [activeTab]);
 
   function toggle(id: string) {
     setSelected((prev) =>
@@ -53,12 +63,14 @@ export function ReportsExportPanel({
       <div>
         <h3 className="text-sm font-semibold">Exportar informe</h3>
         <p className="text-xs text-muted-foreground mt-1">
-          Elige las secciones a incluir. Las fechas del filtro superior aplican a ventas, productos, clientes y utilidades.
+          {activeTab === "cartera"
+            ? "Exporta el resumen de cartera, saldos por cliente, vencimientos y abonos del período."
+            : "Elige las secciones a incluir. Las fechas del filtro aplican a ventas, productos, clientes y utilidades."}
         </p>
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {SECTIONS.map((s) => (
+        {sections.map((s) => (
           <label
             key={s.id}
             className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-muted/50"
