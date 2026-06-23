@@ -1,6 +1,10 @@
-const MXN_FORMATTER = new Intl.NumberFormat("es-MX", {
+/** Mexico-only app: always format as pesos mexicanos (es-MX). Ignores CURRENCY_CODE env. */
+const CURRENCY = "MXN" as const;
+const LOCALE = "es-MX" as const;
+
+const MXN_FORMATTER = new Intl.NumberFormat(LOCALE, {
   style: "currency",
-  currency: process.env.CURRENCY_CODE || "MXN",
+  currency: CURRENCY,
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
@@ -17,5 +21,9 @@ export function formatMoneyCents(cents: number): string {
 }
 
 export function getCurrencyCode(): string {
-  return process.env.CURRENCY_CODE || "MXN";
+  return CURRENCY;
+}
+
+export function getCurrencyLocale(): string {
+  return LOCALE;
 }

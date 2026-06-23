@@ -8,6 +8,7 @@ import { PaymentMethod, SaleStatus, SaleType, StockMovementType, CreditPeriodUni
 import { buildChanges, logAudit } from "@/lib/audit";
 import { assertCreditLimit, createCreditPlanInTx } from "@/actions/credit";
 import { toCents } from "@/lib/money";
+import { formatMoney } from "@/lib/currency";
 
 async function requireSalesWrite() {
   const session = await getSession();
@@ -293,8 +294,8 @@ export async function createSale(data: {
     entityLabel: saleNumber,
     summary:
       data.saleType === SaleType.CREDITO
-        ? `Venta a crédito ${saleNumber} por ${total.toFixed(2)} — plan ${creditPlanNumber}`
-        : `Venta ${saleNumber} por ${total.toFixed(2)} (${data.items.length} ítems)`,
+        ? `Venta a crédito ${saleNumber} por ${formatMoney(total)} — plan ${creditPlanNumber}`
+        : `Venta ${saleNumber} por ${formatMoney(total)} (${data.items.length} ítems)`,
     changes: {
       items: data.items.map((i) => ({
         product: i.productName,

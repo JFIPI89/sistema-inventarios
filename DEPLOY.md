@@ -29,8 +29,6 @@ No uses Netlify para este proyecto: Next.js con Server Actions + Prisma funciona
 DATABASE_URL="postgresql://...-pooler....neon.tech/neondb?sslmode=require"
 DIRECT_URL="postgresql://....neon.tech/neondb?sslmode=require"
 AUTH_SECRET="genera-un-secreto-aleatorio-de-32-caracteres-minimo"
-CURRENCY_SYMBOL="$"
-CURRENCY_CODE="USD"
 ```
 
 5. Sincronizar esquema y datos demo:
@@ -70,8 +68,8 @@ git push -u origin main
 | `DATABASE_URL` | URL **pooled** de Neon |
 | `DIRECT_URL` | URL **direct** de Neon |
 | `AUTH_SECRET` | Secreto nuevo (distinto al de desarrollo) |
-| `CURRENCY_SYMBOL` | `$` |
-| `CURRENCY_CODE` | `USD` o `MXN` |
+
+Montos siempre en **MXN**; `CURRENCY_CODE` en Vercel es opcional y se ignora.
 
 4. **Deploy** — Vercel detecta Next.js automáticamente (`vercel.json` ya configurado)
 
@@ -83,8 +81,6 @@ npx vercel link
 npx vercel env add DATABASE_URL
 npx vercel env add DIRECT_URL
 npx vercel env add AUTH_SECRET
-npx vercel env add CURRENCY_SYMBOL
-npx vercel env add CURRENCY_CODE
 npx vercel --prod
 ```
 

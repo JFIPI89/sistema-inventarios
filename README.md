@@ -26,8 +26,6 @@ Crear `.env`:
 DATABASE_URL="postgresql://inventarios:inventarios@localhost:5432/inventarios"
 DIRECT_URL="postgresql://inventarios:inventarios@localhost:5432/inventarios"
 AUTH_SECRET="dev-secret-change-in-production-min-32-chars!!"
-CURRENCY_SYMBOL="$"
-CURRENCY_CODE="USD"
 ```
 
 ```bash
@@ -110,8 +108,8 @@ npm run db:seed
 | `DATABASE_URL` | URL **pooled** de Neon |
 | `DIRECT_URL` | URL **direct** de Neon (opcional en runtime, útil en build) |
 | `AUTH_SECRET` | String aleatorio de 32+ caracteres |
-| `CURRENCY_SYMBOL` | `$` |
-| `CURRENCY_CODE` | `USD` o `MXN` |
+
+Montos siempre en **MXN** (`es-MX`); no hace falta `CURRENCY_CODE` en Vercel.
 
 4. Deploy — Vercel detecta Next.js automáticamente
 

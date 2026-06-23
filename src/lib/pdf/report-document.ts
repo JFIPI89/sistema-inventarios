@@ -1,6 +1,7 @@
 import PDFDocument from "pdfkit";
 import type { LetterheadLogos } from "@/lib/pdf/horus-logo-image";
 import type { ReportSection } from "@/lib/reports/sections";
+import { formatMoney } from "@/lib/currency";
 
 type PdfDoc = InstanceType<typeof PDFDocument>;
 
@@ -112,14 +113,11 @@ type ReportCtx = {
 };
 
 function money(n: number): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: process.env.CURRENCY_CODE || "MXN",
-  }).format(n);
+  return formatMoney(n);
 }
 
 function moneyCents(cents: number): string {
-  return money(cents / 100);
+  return formatMoney(cents / 100);
 }
 
 function logoWidth(height: number, variant: "full" | "mark"): number {

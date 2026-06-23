@@ -10,7 +10,7 @@ if (-not (Test-Path .env)) {
 }
 
 Get-Content .env | ForEach-Object {
-    if ($_ -match '^(DATABASE_URL|DIRECT_URL|AUTH_SECRET|CURRENCY_SYMBOL|CURRENCY_CODE)=') {
+    if ($_ -match '^(DATABASE_URL|DIRECT_URL|AUTH_SECRET)=') {
         $name = $_.Split('=')[0]
         Write-Host "[ ] $name — copy to Vercel Production env"
     }
