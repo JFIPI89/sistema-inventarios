@@ -1,15 +1,14 @@
 import PDFDocument from "pdfkit";
-import { drawHorusMarkPdf, PDF_BRAND } from "@/lib/pdf/horus-mark";
+import type { LetterheadLogos } from "@/lib/pdf/horus-logo-image";
+import type { ReportSection } from "@/lib/reports/sections";
 
 type PdfDoc = InstanceType<typeof PDFDocument>;
 
-const GOLD = PDF_BRAND.GOLD;
-const CHARCOAL = PDF_BRAND.CHARCOAL;
+const GOLD = "#C9A84C";
+const CHARCOAL = "#1a1a1a";
 const MARGIN = 50;
 const PAGE_WIDTH = 612;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
-
-import type { ReportSection } from "@/lib/reports/sections";
 
 export type { ReportSection };
 
@@ -56,6 +55,13 @@ export type ReportPdfData = {
   }>;
 };
 
+type ReportCtx = {
+  title: string;
+  start: string;
+  end: string;
+  logos: LetterheadLogos;
+};
+
 function money(n: number): string {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
@@ -63,42 +69,40 @@ function money(n: number): string {
   }).format(n);
 }
 
+function logoWidth(height: number, variant: "full" | "mark"): number {
+  const aspect = variant === "full" ? 595 / 800 : 595 / 480;
+  return height * aspect;
+}
+
 function drawLetterhead(
   doc: PdfDoc,
   title: string,
   startDate: string,
   endDate: string,
+  logos: LetterheadLogos,
   compact = false
 ) {
-  const bandHeight = compact ? 56 : 72;
-  const markSize = compact ? 40 : 48;
-  const textX = MARGIN + markSize + 12;
+  const logoHeight = compact ? 36 : 64;
+  const variant = compact ? "mark" : "full";
+  const logoBuffer = compact ? logos.mark : logos.full;
+  const bandHeight = compact ? 52 : 84;
+  const logoY = compact ? 8 : 10;
+  const textX = MARGIN + logoWidth(logoHeight, variant) + 14;
 
   doc.rect(0, 0, PAGE_WIDTH, bandHeight).fill(CHARCOAL);
-
-  drawHorusMarkPdf(doc, MARGIN, compact ? 8 : 10, markSize);
-
-  doc
-    .fillColor("#8a8580")
-    .fontSize(compact ? 7 : 8)
-    .text("DISTRIBUIDORA", textX, compact ? 12 : 14);
-
-  doc
-    .fillColor(GOLD)
-    .fontSize(compact ? 11 : 13)
-    .text("HORUS", textX, compact ? 22 : 26);
+  doc.image(logoBuffer, MARGIN, logoY, { height: logoHeight });
 
   doc
     .fillColor("#cccccc")
     .fontSize(compact ? 8 : 9)
-    .text(title, textX, compact ? 36 : 44, { width: 220 });
+    .text(title, textX, compact ? 14 : 18, { width: PAGE_WIDTH - textX - MARGIN });
 
   if (!compact) {
     doc
       .fillColor("#999999")
       .fontSize(8)
-      .text(`Período: ${startDate} — ${endDate}`, 320, 18, { width: 240, align: "right" });
-    doc.text(`Generado: ${new Date().toLocaleString("es-MX")}`, 320, 32, {
+      .text(`Período: ${startDate} — ${endDate}`, 320, 22, { width: 240, align: "right" });
+    doc.text(`Generado: ${new Date().toLocaleString("es-MX")}`, 320, 38, {
       width: 240,
       align: "right",
     });
@@ -115,10 +119,10 @@ function drawLetterhead(
   doc.y = bandHeight + 16;
 }
 
-function ensureSpace(doc: PdfDoc, needed: number, ctx: { title: string; start: string; end: string }) {
+function ensureSpace(doc: PdfDoc, needed: number, ctx: ReportCtx) {
   if (doc.y + needed > doc.page.height - 60) {
     doc.addPage();
-    drawLetterhead(doc, ctx.title, ctx.start, ctx.end, true);
+    drawLetterhead(doc, ctx.title, ctx.start, ctx.end, ctx.logos, true);
   }
 }
 
@@ -134,7 +138,7 @@ function drawTable(
   headers: string[],
   rows: string[][],
   colWidths: number[],
-  ctx: { title: string; start: string; end: string }
+  ctx: ReportCtx
 ) {
   const rowHeight = 16;
   const headerHeight = 18;
@@ -169,7 +173,10 @@ function drawTable(
   doc.moveDown(0.8);
 }
 
-export function buildReportPdf(data: ReportPdfData): Promise<Buffer> {
+export async function buildReportPdf(data: ReportPdfData): Promise<Buffer> {
+  const { loadLetterheadLogos } = await import("@/lib/pdf/horus-logo-image");
+  const logos = await loadLetterheadLogos();
+
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "LETTER", margin: MARGIN, bufferPages: true });
     const chunks: Buffer[] = [];
@@ -177,13 +184,14 @@ export function buildReportPdf(data: ReportPdfData): Promise<Buffer> {
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    const ctx = {
+    const ctx: ReportCtx = {
       title: "Informe de operaciones",
       start: data.startDate,
       end: data.endDate,
+      logos,
     };
 
-    drawLetterhead(doc, ctx.title, data.startDate, data.endDate);
+    drawLetterhead(doc, ctx.title, data.startDate, data.endDate, logos);
 
     if (data.sections.includes("sales") && data.sales) {
       drawSectionTitle(doc, "Ventas del período");

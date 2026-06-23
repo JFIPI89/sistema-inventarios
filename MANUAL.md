@@ -211,7 +211,7 @@ Menú **Informes** (`/reports`):
    - Top clientes
    - Utilidades
    - Inventario valorizado *(snapshot actual, sin filtro de fechas)*
-3. **Exportar PDF** — documento con hoja membretada **DISTRIBUIDORA HORUS** (isotipo vectorial dorado, línea dorada, pie de página).
+3. **Exportar PDF** — documento con hoja membretada **DISTRIBUIDORA HORUS** (logo oficial rasterizado desde el mismo SVG de la web, línea dorada, pie de página).
 4. **Exportar CSV** — un solo archivo con las mismas secciones marcadas (bloques separados por título, compatible con Excel).
 
 Debes seleccionar al menos una sección para generar el PDF o el CSV.

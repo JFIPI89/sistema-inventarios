@@ -21,6 +21,9 @@
   --sidebar-foreground: #1a1816;
   --sidebar-border: rgba(201, 168, 76, 0.2);
   --sidebar-active: rgba(201, 168, 76, 0.15);
+  --logo-ink: var(--foreground);
+  --logo-detail: var(--muted-foreground);
+  --logo-base: var(--background);
 }
 
 .dark {
@@ -38,6 +41,9 @@
   --sidebar-foreground: #f0ede8;
   --sidebar-border: rgba(201, 168, 76, 0.15);
   --sidebar-active: rgba(201, 168, 76, 0.12);
+  --logo-ink: var(--foreground);
+  --logo-detail: #a8a4a0;
+  --logo-base: transparent;
 }
 
 @theme inline {
