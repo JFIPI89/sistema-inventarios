@@ -3,12 +3,14 @@ import {
   pathBase,
   pathDetail,
   pathInk,
+  pathMid,
   type HorusLogoVariant,
 } from "@/lib/brand/horus-logo-paths";
 
 export type HorusLogoColors = {
   ink: string;
   detail: string;
+  mid: string;
   base: string;
 };
 
@@ -23,6 +25,7 @@ export function buildHorusLogoSvg(
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}">
   <path d="${pathBase}" fill="${baseFill}"/>
   <path d="${pathDetail}" fill="${colors.detail}"/>
+  <path d="${pathMid}" fill="${colors.mid}"/>
   <path d="${pathInk}" fill="${colors.ink}"/>
 </svg>`;
 }
@@ -31,6 +34,7 @@ export function buildHorusLogoSvg(
 export const FRONTEND_LOGO_FILLS = {
   base: "var(--logo-base)",
   detail: "var(--logo-detail)",
+  mid: "var(--logo-mid)",
   ink: "var(--logo-ink)",
 } as const;
 
@@ -38,6 +42,7 @@ export const FRONTEND_LOGO_FILLS = {
 export const PDF_LOGO_COLORS: HorusLogoColors = {
   ink: "#f0ede8",
   detail: "#c9a84c",
+  mid: "#a8a4a0",
   base: "none",
 };
 
@@ -45,5 +50,6 @@ export const PDF_LOGO_COLORS: HorusLogoColors = {
 export const FAVICON_LOGO_COLORS: HorusLogoColors = {
   ink: "#1a1816",
   detail: "#8a8580",
+  mid: "#b8b4ae",
   base: "#f5f2ec",
 };

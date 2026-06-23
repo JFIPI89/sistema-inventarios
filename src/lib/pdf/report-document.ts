@@ -70,7 +70,7 @@ function money(n: number): string {
 }
 
 function logoWidth(height: number, variant: "full" | "mark"): number {
-  const aspect = variant === "full" ? 595 / 800 : 595 / 480;
+  const aspect = variant === "full" ? 752 / 800 : 752 / 480;
   return height * aspect;
 }
 

@@ -2,6 +2,8 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: light dark;
+
   --gold: #c9a84c;
   --gold-light: #e8c97a;
   --gold-dim: #8b6b2a;
@@ -23,6 +25,7 @@
   --sidebar-active: rgba(201, 168, 76, 0.15);
   --logo-ink: var(--foreground);
   --logo-detail: var(--muted-foreground);
+  --logo-mid: color-mix(in srgb, var(--foreground) 40%, var(--background));
   --logo-base: var(--background);
 }
 
@@ -42,7 +45,8 @@
   --sidebar-border: rgba(201, 168, 76, 0.15);
   --sidebar-active: rgba(201, 168, 76, 0.12);
   --logo-ink: var(--foreground);
-  --logo-detail: #a8a4a0;
+  --logo-detail: var(--muted-foreground);
+  --logo-mid: color-mix(in srgb, var(--foreground) 55%, transparent);
   --logo-base: transparent;
 }
 

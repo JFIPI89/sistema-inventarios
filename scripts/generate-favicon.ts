@@ -1,7 +1,10 @@
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildHorusLogoSvg, FAVICON_LOGO_COLORS } from "../src/lib/brand/build-horus-logo-svg.ts";
+import {
+  buildHorusLogoSvg,
+  FAVICON_LOGO_COLORS,
+} from "../src/lib/brand/build-horus-logo-svg";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 writeFileSync(

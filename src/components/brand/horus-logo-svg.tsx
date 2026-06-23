@@ -3,14 +3,15 @@ import {
   pathBase,
   pathDetail,
   pathInk,
+  pathMid,
   type HorusLogoVariant,
 } from "@/lib/brand/horus-logo-paths";
 import { FRONTEND_LOGO_FILLS } from "@/lib/brand/build-horus-logo-svg";
 import { cn } from "@/lib/utils";
 
 const heights = {
-  sm: "h-8",
-  md: "h-10",
+  sm: "h-11",
+  md: "h-12",
   lg: "h-36",
 } as const;
 
@@ -34,6 +35,7 @@ export function HorusLogoSvg({
     >
       <path d={pathBase} fill={FRONTEND_LOGO_FILLS.base} />
       <path d={pathDetail} fill={FRONTEND_LOGO_FILLS.detail} />
+      <path d={pathMid} fill={FRONTEND_LOGO_FILLS.mid} />
       <path d={pathInk} fill={FRONTEND_LOGO_FILLS.ink} />
     </svg>
   );
