@@ -145,6 +145,7 @@ model Customer {
   address     String?
   notes       String?
   isActive    Boolean      @default(true)
+  creditLimitCents Int?
   createdAt   DateTime     @default(now())
   sales       Sale[]
   creditPlans CreditPlan[]

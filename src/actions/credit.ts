@@ -19,6 +19,13 @@ import {
   splitInstallments,
   toCents,
 } from "@/lib/money";
+import {
+  collectUpcomingInstallments,
+  getCustomerOutstandingCents,
+  loadCreditReportData,
+  type CreditReportData,
+} from "@/lib/credit-report";
+import { computeCreditRating } from "@/lib/credit-metrics";
 
 async function requireSalesWrite() {
   const session = await getSession();
@@ -118,6 +125,7 @@ export async function createCreditPlanManual(data: {
   const totalCents = toCents(data.totalAmount);
 
   try {
+    await assertCreditLimit(data.customerId, totalCents);
     const plan = await prisma.$transaction((tx) =>
       createCreditPlanInTx(tx, {
         customerId: data.customerId,
@@ -346,6 +354,135 @@ export async function cancelCreditPlan(id: string) {
   revalidatePath(`/credit/${id}`);
   revalidatePath(`/customers/${plan.customerId}`);
   return { success: true };
+}
+
+export async function assertCreditLimit(customerId: string, newAmountCents: number) {
+  const customer = await prisma.customer.findUnique({ where: { id: customerId } });
+  if (!customer?.creditLimitCents) return;
+
+  const used = await getCustomerOutstandingCents(customerId);
+  const limit = customer.creditLimitCents;
+  const available = Math.max(0, limit - used);
+
+  if (used + newAmountCents > limit) {
+    throw new Error(
+      `Tope de crédito excedido. Usado: ${formatCents(used)}, tope: ${formatCents(limit)}, disponible: ${formatCents(available)}`
+    );
+  }
+}
+
+export type CustomerCreditProfile = {
+  rating: ReturnType<typeof computeCreditRating>["rating"];
+  ratingLabel: string;
+  onTimePercent: number;
+  outstandingCents: number;
+  limitCents: number | null;
+  availableCents: number | null;
+};
+
+export async function getCustomerCreditProfile(
+  customerId: string
+): Promise<CustomerCreditProfile | null> {
+  await requireSalesWrite();
+
+  const customer = await prisma.customer.findUnique({ where: { id: customerId } });
+  if (!customer) return null;
+
+  const [outstandingCents, plans] = await Promise.all([
+    getCustomerOutstandingCents(customerId),
+    prisma.creditPlan.findMany({
+      where: {
+        customerId,
+        status: { in: [CreditPlanStatus.ACTIVE, CreditPlanStatus.PAID] },
+      },
+      include: {
+        installments: {
+          include: { payments: { orderBy: { paidAt: "desc" } } },
+        },
+      },
+    }),
+  ]);
+
+  const installments = plans.flatMap((p) => p.installments);
+  const { rating, onTimePercent, label } = computeCreditRating(installments);
+  const limitCents = customer.creditLimitCents;
+  const availableCents =
+    limitCents != null ? Math.max(0, limitCents - outstandingCents) : null;
+
+  return {
+    rating,
+    ratingLabel: label,
+    onTimePercent,
+    outstandingCents,
+    limitCents,
+    availableCents,
+  };
+}
+
+export type CreditDashboardData = {
+  summary: CreditReportData["summary"];
+  agingBuckets: CreditReportData["agingBuckets"];
+  overdueInstallments: CreditReportData["overdueInstallments"];
+  upcomingInstallments: CreditReportData["upcomingInstallments"];
+  recentPayments: CreditReportData["paymentsInPeriod"];
+  topCustomers: CreditReportData["byCustomer"];
+};
+
+export async function getCreditDashboard(): Promise<CreditDashboardData> {
+  await requireSalesWrite();
+  await syncOverdueInstallments();
+
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - 30);
+
+  const [report, recentPayments, activePlans] = await Promise.all([
+    loadCreditReportData(start.toISOString().slice(0, 10), end.toISOString().slice(0, 10)),
+    prisma.creditPayment.findMany({
+      take: 10,
+      orderBy: { paidAt: "desc" },
+      include: {
+        user: { select: { name: true } },
+        installment: {
+          include: {
+            creditPlan: { include: { customer: true } },
+          },
+        },
+      },
+    }),
+    prisma.creditPlan.findMany({
+      where: { status: CreditPlanStatus.ACTIVE },
+      include: { customer: true, installments: true },
+    }),
+  ]);
+
+  const upcomingInstallments = collectUpcomingInstallments(activePlans, new Date(), 7);
+
+  return {
+    summary: report.summary,
+    agingBuckets: report.agingBuckets,
+    overdueInstallments: report.overdueInstallments.slice(0, 10),
+    upcomingInstallments: upcomingInstallments.slice(0, 10),
+    recentPayments: recentPayments.map((p) => ({
+      paidAt: p.paidAt,
+      planNumber: p.installment.creditPlan.planNumber,
+      customerName: p.installment.creditPlan.customer.name,
+      installmentNumber: p.installment.number,
+      amountCents: p.amountCents,
+      paymentMethod: p.paymentMethod,
+      userName: p.user.name,
+    })),
+    topCustomers: report.byCustomer.slice(0, 10),
+  };
+}
+
+export async function getCreditOperationalReport(
+  startDate: string,
+  endDate: string
+): Promise<CreditReportData> {
+  await requireSalesWrite();
+  await syncOverdueInstallments();
+  return loadCreditReportData(startDate, endDate);
 }
 
 /** Recompute OVERDUE status for listing (no cron in v1). */

@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { searchProductsForSale, createSale, type CartItem } from "@/actions/sales";
+import { getCustomerCreditProfile, type CustomerCreditProfile } from "@/actions/credit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { buildInstallmentPreview, formatCents, toCents } from "@/lib/money";
 import { CreditPeriodUnit, PaymentMethod, SaleType } from "@prisma/client";
 import { Trash2 } from "lucide-react";
+import { CreditRatingBadge } from "@/components/credit/credit-rating-badge";
 
 type Customer = { id: string; code: string; name: string };
 
@@ -29,6 +31,21 @@ export function PosClient({ customers }: { customers: Customer[] }) {
   const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [creditProfile, setCreditProfile] = useState<CustomerCreditProfile | null>(null);
+
+  useEffect(() => {
+    if (!customerId || saleType !== SaleType.CREDITO) {
+      setCreditProfile(null);
+      return;
+    }
+    let cancelled = false;
+    getCustomerCreditProfile(customerId).then((profile) => {
+      if (!cancelled) setCreditProfile(profile);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [customerId, saleType]);
 
   async function handleSearch() {
     const products = await searchProductsForSale(query);
@@ -179,6 +196,21 @@ export function PosClient({ customers }: { customers: Customer[] }) {
                 </option>
               ))}
             </select>
+            {saleType === SaleType.CREDITO && customerId && creditProfile && (
+              <div className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2 text-sm">
+                <CreditRatingBadge rating={creditProfile.rating} label={creditProfile.ratingLabel} />
+                {creditProfile.limitCents != null ? (
+                  <span>
+                    Disponible:{" "}
+                    <span className="font-medium text-success">
+                      {formatCents(creditProfile.availableCents ?? 0)}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">Sin tope de crédito</span>
+                )}
+              </div>
+            )}
           </div>
 
           {cart.length === 0 ? (

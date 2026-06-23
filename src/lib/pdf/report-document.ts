@@ -58,12 +58,23 @@ export type ReportPdfData = {
       activePlans: number;
       totalPortfolioCents: number;
       totalOutstandingCents: number;
+      totalCollectedCents?: number;
       collectedInPeriodCents: number;
       paymentsInPeriodCount: number;
       overdueInstallmentsCount: number;
       overdueAmountCents: number;
       newPlansInPeriod: number;
       newPlansAmountCents: number;
+      collectionRatePercent?: number;
+      dueNext7Cents?: number;
+      dueNext30Cents?: number;
+    };
+    agingBuckets?: {
+      alDia: number;
+      vencido_1_7: number;
+      vencido_8_30: number;
+      vencido_31_60: number;
+      vencido_60_plus: number;
     };
     byCustomer: Array<{
       name: string;
@@ -71,6 +82,9 @@ export type ReportPdfData = {
       activePlans: number;
       outstandingCents: number;
       overdueCents: number;
+      rating?: string | null;
+      creditLimitCents?: number | null;
+      availableCents?: number | null;
     }>;
     overdueInstallments: Array<{
       planNumber: string;
@@ -100,7 +114,7 @@ type ReportCtx = {
 function money(n: number): string {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
-    currency: process.env.CURRENCY_CODE || "USD",
+    currency: process.env.CURRENCY_CODE || "MXN",
   }).format(n);
 }
 
@@ -325,22 +339,41 @@ export async function buildReportPdf(data: ReportPdfData): Promise<Buffer> {
       drawSectionTitle(doc, "Cartera / crédito");
       const s = data.credit.summary;
       doc.fontSize(9).text(
-        `Cartera activa: ${moneyCents(s.totalPortfolioCents)} (${s.activePlans} planes)  |  Pendiente: ${moneyCents(s.totalOutstandingCents)}  |  Cobrado período: ${moneyCents(s.collectedInPeriodCents)}  |  Vencido: ${moneyCents(s.overdueAmountCents)} (${s.overdueInstallmentsCount} cuotas)`
+        `Cartera activa: ${moneyCents(s.totalPortfolioCents)} (${s.activePlans} planes)  |  Pendiente: ${moneyCents(s.totalOutstandingCents)}  |  Recuperación: ${s.collectionRatePercent ?? 0}%  |  Cobrado período: ${moneyCents(s.collectedInPeriodCents)}  |  Vencido: ${moneyCents(s.overdueAmountCents)} (${s.overdueInstallmentsCount} cuotas)`
       );
       doc.moveDown(0.4);
 
-      drawSectionTitle(doc, "Saldo por cliente");
+      if (data.credit.agingBuckets) {
+        const a = data.credit.agingBuckets;
+        drawSectionTitle(doc, "Antigüedad de saldos");
+        drawTable(
+          doc,
+          ["Bucket", "Monto"],
+          [
+            ["Al día", moneyCents(a.alDia)],
+            ["Vencido 1-7 días", moneyCents(a.vencido_1_7)],
+            ["Vencido 8-30 días", moneyCents(a.vencido_8_30)],
+            ["Vencido 31-60 días", moneyCents(a.vencido_31_60)],
+            ["Vencido +60 días", moneyCents(a.vencido_60_plus)],
+          ],
+          [200, 120],
+          ctx
+        );
+      }
+
+      drawSectionTitle(doc, "Calificación por cliente");
       drawTable(
         doc,
-        ["Cliente", "Código", "Planes", "Pendiente", "Vencido"],
+        ["Cliente", "Cód.", "Cal.", "Pendiente", "Tope", "Disp."],
         data.credit.byCustomer.slice(0, 40).map((c) => [
-          c.name.slice(0, 22),
+          c.name.slice(0, 20),
           c.code,
-          String(c.activePlans),
+          c.rating ?? "N/A",
           moneyCents(c.outstandingCents),
-          c.overdueCents > 0 ? moneyCents(c.overdueCents) : "—",
+          c.creditLimitCents != null ? moneyCents(c.creditLimitCents) : "—",
+          c.availableCents != null ? moneyCents(c.availableCents) : "—",
         ]),
-        [120, 60, 45, 75, 75],
+        [110, 55, 35, 75, 70, 70],
         ctx
       );
 

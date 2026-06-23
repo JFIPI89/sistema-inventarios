@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { fromCents } from "@/lib/money";
 
 type CustomerData = {
   code: string;
@@ -16,14 +17,17 @@ type CustomerData = {
   address?: string | null;
   notes?: string | null;
   isActive?: boolean;
+  creditLimitCents?: number | null;
 };
 
 export function CustomerForm({
   action,
   customer,
+  isAdmin = false,
 }: {
   action: (formData: FormData) => Promise<{ error?: string; success?: boolean }>;
   customer?: CustomerData;
+  isAdmin?: boolean;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +79,27 @@ export function CustomerForm({
               <Label htmlFor="notes">Notas</Label>
               <Input id="notes" name="notes" defaultValue={customer?.notes || ""} />
             </div>
+            {isAdmin && customer && (
+              <div className="space-y-2">
+                <Label htmlFor="creditLimit">Tope de crédito (MXN)</Label>
+                <Input
+                  id="creditLimit"
+                  name="creditLimit"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder="Sin tope"
+                  defaultValue={
+                    customer.creditLimitCents != null
+                      ? fromCents(customer.creditLimitCents)
+                      : ""
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Dejar vacío para sin límite. Solo administradores pueden editar.
+                </p>
+              </div>
+            )}
             {customer && (
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="isActive" name="isActive" defaultChecked={customer.isActive !== false} />

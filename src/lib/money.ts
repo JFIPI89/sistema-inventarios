@@ -13,11 +13,11 @@ export function fromCents(cents: number): number {
   return cents / 100;
 }
 
+import { formatMoney, formatMoneyCents } from "@/lib/currency";
+
+/** @deprecated Use formatMoneyCents */
 export function formatCents(cents: number): string {
-  const symbol = process.env.CURRENCY_SYMBOL || "$";
-  const whole = Math.trunc(cents / 100);
-  const frac = Math.abs(cents % 100);
-  return `${symbol}${whole}.${String(frac).padStart(2, "0")}`;
+  return formatMoneyCents(cents);
 }
 
 /** Split totalCents into n installments; remainder goes to last installment. */

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCustomer, updateCustomer } from "@/actions/sales";
-import { getCustomerCreditSummary, getCustomerCreditPlans } from "@/actions/credit";
+import { getCustomerCreditSummary, getCustomerCreditPlans, getCustomerCreditProfile } from "@/actions/credit";
 import { CustomerForm } from "@/components/customers/customer-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,9 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { formatCents } from "@/lib/money";
 import { CREDIT_PLAN_STATUS_LABELS } from "@/lib/credit-labels";
 import { PageHeader } from "@/components/layout/page-header";
+import { CreditRatingBadge } from "@/components/credit/credit-rating-badge";
+import { getSession } from "@/lib/auth";
+import { Role } from "@prisma/client";
 
 export default async function CustomerDetailPage({
   params,
@@ -20,12 +23,15 @@ export default async function CustomerDetailPage({
   const customer = await getCustomer(id);
   if (!customer) notFound();
 
-  const [creditSummary, customerPlans] = await Promise.all([
+  const [creditSummary, customerPlans, creditProfile, session] = await Promise.all([
     getCustomerCreditSummary(id),
     getCustomerCreditPlans(id),
+    getCustomerCreditProfile(id),
+    getSession(),
   ]);
 
   const updateAction = updateCustomer.bind(null, id);
+  const isAdmin = session?.role === Role.ADMIN;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -34,7 +40,7 @@ export default async function CustomerDetailPage({
           <Button variant="outline">Volver</Button>
         </Link>
       </PageHeader>
-      <CustomerForm action={updateAction} customer={customer} />
+      <CustomerForm action={updateAction} customer={customer} isAdmin={isAdmin} />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -46,6 +52,32 @@ export default async function CustomerDetailPage({
           </Link>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
+          {creditProfile && (
+            <div className="flex flex-wrap items-center gap-3 rounded-md border border-border p-3">
+              <CreditRatingBadge rating={creditProfile.rating} label={creditProfile.ratingLabel} />
+              <span className="text-muted-foreground">
+                Puntualidad: {creditProfile.onTimePercent}%
+              </span>
+              {creditProfile.limitCents != null ? (
+                <>
+                  <span>
+                    Tope: <span className="font-medium">{formatCents(creditProfile.limitCents)}</span>
+                  </span>
+                  <span>
+                    Usado: <span className="font-medium">{formatCents(creditProfile.outstandingCents)}</span>
+                  </span>
+                  <span>
+                    Disponible:{" "}
+                    <span className="font-medium text-success">
+                      {formatCents(creditProfile.availableCents ?? 0)}
+                    </span>
+                  </span>
+                </>
+              ) : (
+                <span className="text-muted-foreground">Sin tope de crédito</span>
+              )}
+            </div>
+          )}
           <p>
             <span className="text-muted-foreground">Planes activos:</span> {creditSummary.activePlans}
           </p>

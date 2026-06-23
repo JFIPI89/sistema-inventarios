@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { canWriteSales } from "@/lib/permissions";
-import { PaymentMethod, SaleStatus, SaleType, StockMovementType, CreditPeriodUnit } from "@prisma/client";
+import { PaymentMethod, SaleStatus, SaleType, StockMovementType, CreditPeriodUnit, Role } from "@prisma/client";
 import { buildChanges, logAudit } from "@/lib/audit";
-import { createCreditPlanInTx } from "@/actions/credit";
+import { assertCreditLimit, createCreditPlanInTx } from "@/actions/credit";
 import { toCents } from "@/lib/money";
 
 async function requireSalesWrite() {
@@ -96,7 +96,18 @@ export async function updateCustomer(id: string, formData: FormData) {
     isActive: formData.get("isActive") === "on",
   };
 
-  await prisma.customer.update({ where: { id }, data: afterData });
+  const updateData: typeof afterData & { creditLimitCents?: number | null } = { ...afterData };
+
+  if (session.role === Role.ADMIN) {
+    const limitRaw = String(formData.get("creditLimit") || "").trim();
+    updateData.creditLimitCents =
+      limitRaw === "" ? null : toCents(parseFloat(limitRaw.replace(",", ".")));
+    if (limitRaw !== "" && (Number.isNaN(updateData.creditLimitCents!) || updateData.creditLimitCents! < 0)) {
+      return { error: "Tope de crédito inválido" };
+    }
+  }
+
+  await prisma.customer.update({ where: { id }, data: updateData });
 
   await logAudit({
     session,
@@ -199,6 +210,10 @@ export async function createSale(data: {
   let creditPlanNumber: string | undefined;
 
   try {
+    if (data.saleType === SaleType.CREDITO && data.customerId) {
+      await assertCreditLimit(data.customerId, totalCents);
+    }
+
     await prisma.$transaction(async (tx) => {
       const sale = await tx.sale.create({
         data: {
@@ -385,6 +400,34 @@ export async function cancelSale(id: string) {
   revalidatePath("/sales");
   revalidatePath("/lots");
   return { success: true };
+}
+
+export async function getCreditPortfolioSnapshot() {
+  const session = await getSession();
+  if (!session || !canWriteSales(session.role)) {
+    return { activePlans: 0, totalOutstandingCents: 0 };
+  }
+
+  const activePlans = await prisma.creditPlan.count({
+    where: { status: "ACTIVE" },
+  });
+  if (activePlans === 0) {
+    return { activePlans: 0, totalOutstandingCents: 0 };
+  }
+
+  const plans = await prisma.creditPlan.findMany({
+    where: { status: "ACTIVE" },
+    include: { installments: true },
+  });
+
+  let totalOutstandingCents = 0;
+  for (const plan of plans) {
+    for (const inst of plan.installments) {
+      totalOutstandingCents += Math.max(0, inst.amountCents - inst.paidCents);
+    }
+  }
+
+  return { activePlans, totalOutstandingCents };
 }
 
 export async function getDashboardStats() {

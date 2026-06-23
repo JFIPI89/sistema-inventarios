@@ -5,9 +5,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+import { formatMoney } from "@/lib/currency";
+
 export function formatCurrency(amount: number): string {
-  const symbol = process.env.CURRENCY_SYMBOL || "$";
-  return `${symbol}${amount.toFixed(2)}`;
+  return formatMoney(amount);
 }
 
 export function formatDate(date: Date | string | null | undefined): string {

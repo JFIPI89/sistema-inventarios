@@ -5,8 +5,8 @@ import {
   getSalesByCustomer,
   getInventoryValuation,
   getSalesProfitReport,
-  getCreditReport,
 } from "@/actions/reports";
+import { getCreditOperationalReport } from "@/actions/credit";
 import { buildReportPdf, type ReportPdfData } from "@/lib/pdf/report-document";
 import { parseSections } from "@/lib/reports/sections";
 
@@ -67,15 +67,19 @@ export async function GET(request: NextRequest) {
     }
 
     if (sections.includes("credit")) {
-      const credit = await getCreditReport(start, end);
+      const credit = await getCreditOperationalReport(start, end);
       pdfData.credit = {
         summary: credit.summary,
+        agingBuckets: credit.agingBuckets,
         byCustomer: credit.byCustomer.map((c) => ({
           name: c.name,
           code: c.code,
           activePlans: c.activePlans,
           outstandingCents: c.outstandingCents,
           overdueCents: c.overdueCents,
+          rating: c.rating,
+          creditLimitCents: c.creditLimitCents,
+          availableCents: c.availableCents,
         })),
         overdueInstallments: credit.overdueInstallments.map((i) => ({
           planNumber: i.planNumber,
