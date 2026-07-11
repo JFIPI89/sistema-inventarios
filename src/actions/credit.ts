@@ -26,6 +26,7 @@ import {
   type CreditReportData,
 } from "@/lib/credit-report";
 import { computeCreditRating } from "@/lib/credit-metrics";
+import { defaultDateRangeDays, parseAppDate } from "@/lib/timezone";
 
 async function requireSalesWrite() {
   const session = await getSession();
@@ -119,7 +120,7 @@ export async function createCreditPlanManual(data: {
   const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
   if (!customer) return { error: "Cliente no encontrado" };
 
-  const startDate = new Date(data.startDate);
+  const startDate = parseAppDate(data.startDate);
   if (Number.isNaN(startDate.getTime())) return { error: "Fecha inválida" };
 
   const totalCents = toCents(data.totalAmount);
@@ -432,12 +433,10 @@ export async function getCreditDashboard(): Promise<CreditDashboardData> {
   await requireSalesWrite();
   await syncOverdueInstallments();
 
-  const end = new Date();
-  const start = new Date();
-  start.setDate(start.getDate() - 30);
+  const { start, end } = defaultDateRangeDays(30);
 
   const [report, recentPayments, activePlans] = await Promise.all([
-    loadCreditReportData(start.toISOString().slice(0, 10), end.toISOString().slice(0, 10)),
+    loadCreditReportData(start, end),
     prisma.creditPayment.findMany({
       take: 10,
       orderBy: { paidAt: "desc" },

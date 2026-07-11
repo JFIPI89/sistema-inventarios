@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { buildInstallmentPreview, formatCents, toCents } from "@/lib/money";
 import { CreditPeriodUnit } from "@prisma/client";
-import { formatDate } from "@/lib/utils";
+import { formatDate, toDateKey, parseAppDate } from "@/lib/utils";
 
 type Customer = { id: string; code: string; name: string };
 
@@ -19,7 +19,7 @@ export function CreditPlanForm({ customers }: { customers: Customer[] }) {
   const [totalAmount, setTotalAmount] = useState("");
   const [installmentCount, setInstallmentCount] = useState(3);
   const [periodUnit, setPeriodUnit] = useState<CreditPeriodUnit>(CreditPeriodUnit.MONTHS);
-  const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [startDate, setStartDate] = useState(() => toDateKey());
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -27,7 +27,7 @@ export function CreditPlanForm({ customers }: { customers: Customer[] }) {
   const preview = useMemo(() => {
     const cents = toCents(totalAmount || "0");
     if (cents <= 0) return [];
-    const start = new Date(startDate + "T12:00:00");
+    const start = parseAppDate(startDate);
     if (Number.isNaN(start.getTime())) return [];
     return buildInstallmentPreview(cents, installmentCount, periodUnit, start);
   }, [totalAmount, installmentCount, periodUnit, startDate]);

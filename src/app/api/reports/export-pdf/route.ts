@@ -9,6 +9,7 @@ import {
 import { getCreditOperationalReport } from "@/actions/credit";
 import { buildReportPdf, type ReportPdfData } from "@/lib/pdf/report-document";
 import { parseSections } from "@/lib/reports/sections";
+import { formatDateKey, formatDateTimeIso } from "@/lib/timezone";
 
 export async function GET(request: NextRequest) {
   const start = request.nextUrl.searchParams.get("start") || "";
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
         summary,
         rows: sales.map((s) => ({
           saleNumber: s.saleNumber,
-          saleDate: s.saleDate.toISOString(),
+          saleDate: formatDateTimeIso(s.saleDate),
           subtotal: s.subtotal,
           discount: s.discount,
           total: s.total,
@@ -85,11 +86,11 @@ export async function GET(request: NextRequest) {
           planNumber: i.planNumber,
           customerName: i.customerName,
           installmentNumber: i.installmentNumber,
-          dueDate: i.dueDate.toISOString(),
+          dueDate: formatDateKey(i.dueDate),
           remainingCents: i.remainingCents,
         })),
         paymentsInPeriod: credit.paymentsInPeriod.map((p) => ({
-          paidAt: p.paidAt.toISOString(),
+          paidAt: formatDateTimeIso(p.paidAt),
           planNumber: p.planNumber,
           customerName: p.customerName,
           installmentNumber: p.installmentNumber,

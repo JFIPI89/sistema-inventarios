@@ -71,6 +71,8 @@ git push -u origin main
 
 Montos siempre en **MXN**; `CURRENCY_CODE` en Vercel es opcional y se ignora.
 
+Fechas y horas se muestran en **America/Mexico_City (CDMX)** vía `Intl` en el código (`src/lib/timezone.ts`). **No hace falta** configurar `TZ` en Vercel para que la UI, PDF y CSV salgan correctos. Si quieres alinear también el timezone del proceso Node, puedes añadir `TZ=America/Mexico_City` (opcional).
+
 4. **Deploy** — Vercel detecta Next.js automáticamente (`vercel.json` ya configurado)
 
 ### Deploy desde CLI (opcional)

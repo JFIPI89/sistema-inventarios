@@ -1,4 +1,8 @@
-import { differenceInCalendarDays, startOfDay } from "date-fns";
+import {
+  calendarDaysBetween,
+  toCalendarDateKey,
+  toDateKey,
+} from "@/lib/timezone";
 
 export type CreditRating = "A" | "B" | "C" | "D" | null;
 
@@ -43,13 +47,13 @@ export function installmentRemaining(inst: Pick<InstallmentRow, "amountCents" | 
 
 export function addToAging(buckets: AgingBuckets, remainingCents: number, dueDate: Date, now = new Date()) {
   if (remainingCents <= 0) return;
-  const today = startOfDay(now);
-  const due = startOfDay(dueDate);
-  if (due >= today) {
+  const todayKey = toDateKey(now);
+  const dueKey = toCalendarDateKey(dueDate);
+  if (dueKey >= todayKey) {
     buckets.alDia += remainingCents;
     return;
   }
-  const days = differenceInCalendarDays(today, due);
+  const days = calendarDaysBetween(dueKey, todayKey);
   if (days <= 7) buckets.vencido_1_7 += remainingCents;
   else if (days <= 30) buckets.vencido_8_30 += remainingCents;
   else if (days <= 60) buckets.vencido_31_60 += remainingCents;
@@ -69,14 +73,15 @@ export function computeAgingFromPlans(plans: PlanRow[], now = new Date()): Aging
 
 export function isInstallmentPaidOnTime(inst: InstallmentRow): boolean | null {
   if (inst.paidCents < inst.amountCents) return null;
+  const dueKey = toCalendarDateKey(inst.dueDate);
   if (!inst.payments?.length) {
-    return startOfDay(new Date()) <= startOfDay(inst.dueDate);
+    return toDateKey(new Date()) <= dueKey;
   }
   const lastPaid = inst.payments.reduce(
     (max, p) => (p.paidAt > max ? p.paidAt : max),
     inst.payments[0]!.paidAt
   );
-  return startOfDay(lastPaid) <= startOfDay(inst.dueDate);
+  return toDateKey(lastPaid) <= dueKey;
 }
 
 export function computeCreditRating(
@@ -94,11 +99,12 @@ export function computeCreditRating(
   }
   const onTimePercent = Math.round((onTime / evaluable.length) * 100);
 
+  const todayKey = toDateKey(now);
   const openOverdue = installments.filter(
-    (i) => installmentRemaining(i) > 0 && startOfDay(i.dueDate) < startOfDay(now)
+    (i) => installmentRemaining(i) > 0 && toCalendarDateKey(i.dueDate) < todayKey
   );
   const maxOverdueDays = openOverdue.reduce((max, i) => {
-    const days = differenceInCalendarDays(startOfDay(now), startOfDay(i.dueDate));
+    const days = calendarDaysBetween(toCalendarDateKey(i.dueDate), todayKey);
     return Math.max(max, days);
   }, 0);
 

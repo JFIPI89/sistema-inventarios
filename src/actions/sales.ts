@@ -9,6 +9,13 @@ import { buildChanges, logAudit } from "@/lib/audit";
 import { assertCreditLimit, createCreditPlanInTx } from "@/actions/credit";
 import { toCents } from "@/lib/money";
 import { formatMoney } from "@/lib/currency";
+import {
+  addAppCalendarDays,
+  parseAppDate,
+  startOfAppDay,
+  startOfZonedDay,
+  toDateKey,
+} from "@/lib/timezone";
 
 async function requireSalesWrite() {
   const session = await getSession();
@@ -199,7 +206,7 @@ export async function createSale(data: {
   const discount = data.discount || 0;
   const total = Math.max(0, subtotal - discount);
   const totalCents = toCents(total);
-  const creditStartDate = data.startDate ? new Date(data.startDate) : new Date();
+  const creditStartDate = data.startDate ? parseAppDate(data.startDate) : startOfAppDay();
 
   if (data.saleType === SaleType.CREDITO && totalCents <= 0) {
     return { error: "El total debe ser mayor a cero para crédito" };
@@ -432,10 +439,8 @@ export async function getCreditPortfolioSnapshot() {
 }
 
 export async function getDashboardStats() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const today = startOfAppDay();
+  const tomorrow = startOfZonedDay(addAppCalendarDays(toDateKey(today), 1));
 
   const [todaySales, totalProducts, lowStock, expiringLots] = await Promise.all([
     prisma.sale.aggregate({

@@ -22,6 +22,7 @@ import { CreditTabs, type CreditView } from "@/components/credit/credit-tabs";
 import { CreditDashboard } from "@/components/credit/credit-dashboard";
 import { CreditReportsView } from "@/components/credit/credit-reports-view";
 import { CreditRatingBadge } from "@/components/credit/credit-rating-badge";
+import { defaultDateRangeDays } from "@/lib/timezone";
 
 function planPaidCents(installments: { paidCents: number }[]) {
   return installments.reduce((s, i) => s + i.paidCents, 0);
@@ -37,13 +38,7 @@ function nextDueInstallment(
 }
 
 function defaultReportDates() {
-  const end = new Date();
-  const start = new Date();
-  start.setDate(start.getDate() - 30);
-  return {
-    start: start.toISOString().slice(0, 10),
-    end: end.toISOString().slice(0, 10),
-  };
+  return defaultDateRangeDays(30);
 }
 
 function parseView(view?: string): CreditView {

@@ -11,17 +11,15 @@ export function formatCurrency(amount: number): string {
   return formatMoney(amount);
 }
 
-export function formatDate(date: Date | string | null | undefined): string {
-  if (!date) return "—";
-  const d = typeof date === "string" ? new Date(date) : date;
-  return d.toLocaleDateString("es-ES");
-}
-
-export function formatDateTime(date: Date | string | null | undefined): string {
-  if (!date) return "—";
-  const d = typeof date === "string" ? new Date(date) : date;
-  return d.toLocaleString("es-ES", {
-    dateStyle: "short",
-    timeStyle: "short",
-  });
-}
+export {
+  formatDate,
+  formatDateTime,
+  formatDateKey,
+  formatDateTimeIso,
+  toDateKey,
+  defaultDateRangeDays,
+  parseAppDate,
+  parseAppDateRange,
+  APP_TIMEZONE,
+  APP_LOCALE,
+} from "@/lib/timezone";

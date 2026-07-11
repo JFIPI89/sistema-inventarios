@@ -7,6 +7,7 @@ import { canWriteProducts } from "@/lib/permissions";
 import { validateGtin, validateLotNumber, normalizeGtin } from "@/lib/gs1";
 import { StockMovementType } from "@prisma/client";
 import { buildChanges, logAudit } from "@/lib/audit";
+import { parseAppDate } from "@/lib/timezone";
 
 async function requireProductWrite() {
   const session = await getSession();
@@ -175,13 +176,13 @@ export async function createLot(formData: FormData) {
   if (!product) return { error: "Producto no encontrado" };
 
   const productionDate = formData.get("productionDate")
-    ? new Date(String(formData.get("productionDate")))
+    ? parseAppDate(String(formData.get("productionDate")))
     : null;
   const expirationDate = formData.get("expirationDate")
-    ? new Date(String(formData.get("expirationDate")))
+    ? parseAppDate(String(formData.get("expirationDate")))
     : null;
   const bestBeforeDate = formData.get("bestBeforeDate")
-    ? new Date(String(formData.get("bestBeforeDate")))
+    ? parseAppDate(String(formData.get("bestBeforeDate")))
     : null;
 
   const lot = await prisma.lot.create({

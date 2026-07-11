@@ -8,6 +8,12 @@ import { SaleStatus } from "@prisma/client";
 import { syncOverdueInstallments } from "@/actions/credit";
 import { fromCents } from "@/lib/money";
 import { loadCreditReportData, type CreditReportData } from "@/lib/credit-report";
+import {
+  formatDateKey,
+  formatDateTimeIso,
+  parseAppDateRange,
+  toDateKey,
+} from "@/lib/timezone";
 
 function csvCell(value: string | number | null | undefined): string {
   const s = String(value ?? "");
@@ -41,9 +47,7 @@ async function requireReportsOrCreditExport(sections: ReportSection[]) {
 export async function getSalesByPeriod(startDate: string, endDate: string) {
   await requireReports();
 
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  end.setHours(23, 59, 59, 999);
+  const { start, end } = parseAppDateRange(startDate, endDate);
 
   const sales = await prisma.sale.findMany({
     where: {
@@ -55,7 +59,7 @@ export async function getSalesByPeriod(startDate: string, endDate: string) {
 
   const byDay: Record<string, { date: string; total: number; count: number }> = {};
   for (const sale of sales) {
-    const key = sale.saleDate.toISOString().slice(0, 10);
+    const key = toDateKey(sale.saleDate);
     if (!byDay[key]) byDay[key] = { date: key, total: 0, count: 0 };
     byDay[key].total += sale.total;
     byDay[key].count += 1;
@@ -74,9 +78,7 @@ export async function getSalesByPeriod(startDate: string, endDate: string) {
 export async function getSalesByProduct(startDate: string, endDate: string) {
   await requireReports();
 
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  end.setHours(23, 59, 59, 999);
+  const { start, end } = parseAppDateRange(startDate, endDate);
 
   const items = await prisma.saleItem.findMany({
     where: {
@@ -109,9 +111,7 @@ export async function getSalesByProduct(startDate: string, endDate: string) {
 export async function getSalesByCustomer(startDate: string, endDate: string) {
   await requireReports();
 
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  end.setHours(23, 59, 59, 999);
+  const { start, end } = parseAppDateRange(startDate, endDate);
 
   const sales = await prisma.sale.findMany({
     where: {
@@ -172,9 +172,7 @@ export async function getInventoryValuation() {
 export async function getSalesProfitReport(startDate: string, endDate: string) {
   await requireReports();
 
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  end.setHours(23, 59, 59, 999);
+  const { start, end } = parseAppDateRange(startDate, endDate);
 
   const sales = await prisma.sale.findMany({
     where: {
@@ -235,7 +233,7 @@ export async function getSalesProfitReport(startDate: string, endDate: string) {
     totalCost += saleCost;
     totalDiscount += sale.discount;
 
-    const dayKey = sale.saleDate.toISOString().slice(0, 10);
+    const dayKey = toDateKey(sale.saleDate);
     if (!byDay[dayKey]) {
       byDay[dayKey] = { date: dayKey, revenue: 0, cost: 0, utility: 0, count: 0 };
     }
@@ -276,7 +274,7 @@ export async function exportReportCsv(
     const rows = sales.map((s) =>
       csvRow([
         s.saleNumber,
-        s.saleDate.toISOString(),
+        formatDateTimeIso(s.saleDate),
         "",
         s.subtotal,
         s.discount,
@@ -347,7 +345,7 @@ export async function exportReportCsv(
         i.quantity,
         i.costPrice,
         i.value,
-        i.expirationDate?.toISOString().slice(0, 10) ?? "",
+        i.expirationDate ? formatDateKey(i.expirationDate) : "",
       ])
     );
     blocks.push(
@@ -413,7 +411,7 @@ export async function exportReportCsv(
           i.planNumber,
           i.customerName,
           i.installmentNumber,
-          i.dueDate.toISOString().slice(0, 10),
+          formatDateKey(i.dueDate),
           fromCents(i.amountCents),
           fromCents(i.paidCents),
           fromCents(i.remainingCents),
@@ -427,7 +425,7 @@ export async function exportReportCsv(
           i.planNumber,
           i.customerName,
           i.installmentNumber,
-          i.dueDate.toISOString().slice(0, 10),
+          formatDateKey(i.dueDate),
           fromCents(i.remainingCents),
         ])
       ),
@@ -436,7 +434,7 @@ export async function exportReportCsv(
       "Fecha,Plan,Cliente,Cuota,Monto MXN,Metodo,Usuario",
       ...credit.paymentsInPeriod.map((p) =>
         csvRow([
-          p.paidAt.toISOString(),
+          formatDateTimeIso(p.paidAt),
           p.planNumber,
           p.customerName,
           p.installmentNumber,

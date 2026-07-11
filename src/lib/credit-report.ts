@@ -9,7 +9,12 @@ import {
   installmentRemaining,
   type PlanRow,
 } from "@/lib/credit-metrics";
-import { addDays, startOfDay } from "date-fns";
+import {
+  addAppCalendarDays,
+  parseAppDateRange,
+  toCalendarDateKey,
+  toDateKey,
+} from "@/lib/timezone";
 
 export type CreditReportData = {
   summary: {
@@ -91,20 +96,21 @@ export function collectUpcomingInstallments(
   periodStart?: Date,
   periodEnd?: Date
 ): CreditReportData["upcomingInstallments"] {
-  const horizon = addDays(startOfDay(now), withinDays);
-  const today = startOfDay(now);
+  const todayKey = toDateKey(now);
+  const horizonKey = addAppCalendarDays(todayKey, withinDays);
   const results: CreditReportData["upcomingInstallments"] = [];
+
+  const periodStartKey = periodStart ? toCalendarDateKey(periodStart) : null;
+  const periodEndKey = periodEnd ? toCalendarDateKey(periodEnd) : null;
 
   for (const plan of plans) {
     for (const inst of plan.installments) {
       const remaining = installmentRemaining(inst);
       if (remaining <= 0) continue;
-      const dueDay = startOfDay(inst.dueDate);
-      if (dueDay < today || dueDay > horizon) continue;
-      if (periodStart && periodEnd) {
-        const start = startOfDay(periodStart);
-        const end = startOfDay(periodEnd);
-        if (dueDay < start || dueDay > end) continue;
+      const dueKey = toCalendarDateKey(inst.dueDate);
+      if (dueKey < todayKey || dueKey > horizonKey) continue;
+      if (periodStartKey && periodEndKey) {
+        if (dueKey < periodStartKey || dueKey > periodEndKey) continue;
       }
       results.push({
         planId: plan.id,
@@ -138,12 +144,11 @@ export async function loadCreditReportData(
   startDate: string,
   endDate: string
 ): Promise<CreditReportData> {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  end.setHours(23, 59, 59, 999);
+  const { start, end } = parseAppDateRange(startDate, endDate);
   const now = new Date();
-  const in7 = addDays(startOfDay(now), 7);
-  const in30 = addDays(startOfDay(now), 30);
+  const todayKey = toDateKey(now);
+  const in7Key = addAppCalendarDays(todayKey, 7);
+  const in30Key = addAppCalendarDays(todayKey, 30);
 
   const [activePlans, payments, newPlansInPeriod, customerPlans] = await Promise.all([
     loadActivePlans(),
@@ -224,8 +229,7 @@ export async function loadCreditReportData(
       planCollected += inst.paidCents;
       planOutstanding += remaining;
 
-      const dueDay = startOfDay(inst.dueDate);
-      const today = startOfDay(now);
+      const dueKey = toCalendarDateKey(inst.dueDate);
 
       if (remaining > 0 && inst.status === "OVERDUE") {
         overdueInstallmentsCount += 1;
@@ -244,10 +248,10 @@ export async function loadCreditReportData(
         });
       }
 
-      if (remaining > 0 && dueDay >= today && dueDay <= in7) {
+      if (remaining > 0 && dueKey >= todayKey && dueKey <= in7Key) {
         dueNext7Cents += remaining;
       }
-      if (remaining > 0 && dueDay >= today && dueDay <= in30) {
+      if (remaining > 0 && dueKey >= todayKey && dueKey <= in30Key) {
         dueNext30Cents += remaining;
       }
     }
@@ -279,7 +283,7 @@ export async function loadCreditReportData(
 
   const chartMap: Record<string, { date: string; totalCents: number; count: number }> = {};
   for (const p of payments) {
-    const key = p.paidAt.toISOString().slice(0, 10);
+    const key = toDateKey(p.paidAt);
     if (!chartMap[key]) chartMap[key] = { date: key, totalCents: 0, count: 0 };
     chartMap[key].totalCents += p.amountCents;
     chartMap[key].count += 1;

@@ -13,15 +13,10 @@ import { ReportsTabs } from "@/components/reports/reports-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/layout/page-header";
+import { defaultDateRangeDays } from "@/lib/timezone";
 
 function defaultDates() {
-  const end = new Date();
-  const start = new Date();
-  start.setDate(start.getDate() - 30);
-  return {
-    start: start.toISOString().slice(0, 10),
-    end: end.toISOString().slice(0, 10),
-  };
+  return defaultDateRangeDays(30);
 }
 
 export default async function ReportsPage({

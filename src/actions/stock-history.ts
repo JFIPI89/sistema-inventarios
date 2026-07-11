@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { canWriteProducts } from "@/lib/permissions";
 import { Prisma, StockMovementType } from "@prisma/client";
+import { parseAppDateRange, startOfZonedDay, endOfZonedDay } from "@/lib/timezone";
 
 async function requireStockRead() {
   const session = await getSession();
@@ -36,13 +37,14 @@ export async function getStockMovements(filters: {
 
   if (filters.dateFrom || filters.dateTo) {
     where.createdAt = {};
-    if (filters.dateFrom) {
-      where.createdAt.gte = new Date(filters.dateFrom);
-    }
-    if (filters.dateTo) {
-      const end = new Date(filters.dateTo);
-      end.setHours(23, 59, 59, 999);
-      where.createdAt.lte = end;
+    if (filters.dateFrom && filters.dateTo) {
+      const range = parseAppDateRange(filters.dateFrom, filters.dateTo);
+      where.createdAt.gte = range.start;
+      where.createdAt.lte = range.end;
+    } else if (filters.dateFrom) {
+      where.createdAt.gte = startOfZonedDay(filters.dateFrom);
+    } else if (filters.dateTo) {
+      where.createdAt.lte = endOfZonedDay(filters.dateTo);
     }
   }
 

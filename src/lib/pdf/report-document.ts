@@ -2,6 +2,7 @@ import PDFDocument from "pdfkit";
 import type { LetterheadLogos } from "@/lib/pdf/horus-logo-image";
 import type { ReportSection } from "@/lib/reports/sections";
 import { formatMoney } from "@/lib/currency";
+import { formatDateTime } from "@/lib/timezone";
 
 type PdfDoc = InstanceType<typeof PDFDocument>;
 
@@ -153,7 +154,7 @@ function drawLetterhead(
       .fillColor("#999999")
       .fontSize(8)
       .text(`Período: ${startDate} — ${endDate}`, 320, 22, { width: 240, align: "right" });
-    doc.text(`Generado: ${new Date().toLocaleString("es-MX")}`, 320, 38, {
+    doc.text(`Generado: ${formatDateTime(new Date())}`, 320, 38, {
       width: 240,
       align: "right",
     });

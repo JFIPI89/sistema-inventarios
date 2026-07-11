@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, toDateKey, parseAppDate } from "@/lib/utils";
 import { buildInstallmentPreview, formatCents, toCents } from "@/lib/money";
 import { CreditPeriodUnit, PaymentMethod, SaleType } from "@prisma/client";
 import { Trash2 } from "lucide-react";
@@ -28,7 +28,7 @@ export function PosClient({ customers }: { customers: Customer[] }) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
   const [installmentCount, setInstallmentCount] = useState(4);
   const [periodUnit, setPeriodUnit] = useState<CreditPeriodUnit>(CreditPeriodUnit.WEEKS);
-  const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [startDate, setStartDate] = useState(() => toDateKey());
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [creditProfile, setCreditProfile] = useState<CustomerCreditProfile | null>(null);
@@ -96,7 +96,7 @@ export function PosClient({ customers }: { customers: Customer[] }) {
 
   const preview = useMemo(() => {
     if (saleType !== SaleType.CREDITO || totalCents <= 0) return [];
-    const start = new Date(startDate + "T12:00:00");
+    const start = parseAppDate(startDate);
     if (Number.isNaN(start.getTime())) return [];
     return buildInstallmentPreview(totalCents, installmentCount, periodUnit, start);
   }, [saleType, totalCents, installmentCount, periodUnit, startDate]);

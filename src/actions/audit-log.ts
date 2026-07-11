@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { Role, AuditAction, Prisma } from "@prisma/client";
 import { AUDIT_ACTION_LABELS, AUDIT_ENTITY_LABELS } from "@/lib/audit";
+import { parseAppDateRange, startOfZonedDay, endOfZonedDay } from "@/lib/timezone";
 
 async function requireAdmin() {
   const session = await getSession();
@@ -29,13 +30,14 @@ export async function getAuditLogs(filters: {
 
   if (filters.dateFrom || filters.dateTo) {
     where.createdAt = {};
-    if (filters.dateFrom) {
-      where.createdAt.gte = new Date(filters.dateFrom);
-    }
-    if (filters.dateTo) {
-      const end = new Date(filters.dateTo);
-      end.setHours(23, 59, 59, 999);
-      where.createdAt.lte = end;
+    if (filters.dateFrom && filters.dateTo) {
+      const range = parseAppDateRange(filters.dateFrom, filters.dateTo);
+      where.createdAt.gte = range.start;
+      where.createdAt.lte = range.end;
+    } else if (filters.dateFrom) {
+      where.createdAt.gte = startOfZonedDay(filters.dateFrom);
+    } else if (filters.dateTo) {
+      where.createdAt.lte = endOfZonedDay(filters.dateTo);
     }
   }
 
