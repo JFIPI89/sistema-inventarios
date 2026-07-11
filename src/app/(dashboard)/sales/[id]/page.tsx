@@ -29,6 +29,9 @@ export default async function SaleDetailPage({
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader title={sale.saleNumber} description={formatDate(sale.saleDate)}>
+        <a href={`/api/sales/${sale.id}/pdf`}>
+          <Button variant="outline">Descargar PDF</Button>
+        </a>
         <Link href="/sales">
           <Button variant="outline">Volver</Button>
         </Link>

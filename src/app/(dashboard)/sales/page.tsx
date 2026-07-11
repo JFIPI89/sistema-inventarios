@@ -79,7 +79,13 @@ export default async function SalesPage({
                     {sale.status === "COMPLETED" ? "Completada" : "Cancelada"}
                   </Badge>
                 </TableCell>
-                <TableCell>
+                <TableCell className="space-x-3 text-right">
+                  <a
+                    href={`/api/sales/${sale.id}/pdf`}
+                    className="text-sm text-primary hover:underline"
+                  >
+                    PDF
+                  </a>
                   <Link href={`/sales/${sale.id}`} className="text-sm text-primary hover:underline">
                     Detalle
                   </Link>
