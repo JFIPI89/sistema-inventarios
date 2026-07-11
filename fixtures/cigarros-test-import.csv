@@ -1,0 +1,9 @@
+sku,name,brand,gtin,costPrice,salePrice,minStock,unitOfMeasure,category,description,barcode
+101001,Denver rojo,Denver,,50.00,80.00,5,pza,CIGARROS,Importación de prueba — inventario esperado 34,
+101002,Denver gris,Denver,,50.00,80.00,5,pza,CIGARROS,Importación de prueba — inventario esperado 30,
+101003,Denver azul,Denver,,50.00,80.00,5,pza,CIGARROS,Importación de prueba — inventario esperado 4,
+101004,Denver verde,Denver,,50.00,80.00,5,pza,CIGARROS,Importación de prueba — inventario esperado 325,
+102001,Endles uva,Endles,,50.00,80.00,5,pza,CIGARROS,Importación de prueba — inventario esperado 9,
+102002,Endles mango,Endles,,50.00,80.00,5,pza,CIGARROS,Importación de prueba — inventario esperado 13,
+102003,Endles piña,Endles,,50.00,80.00,5,pza,CIGARROS,Importación de prueba — inventario esperado 33,
+102004,Endles sandía,Endles,,50.00,80.00,5,pza,CIGARROS,Importación de prueba — inventario esperado 44,

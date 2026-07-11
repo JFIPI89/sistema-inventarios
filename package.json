@@ -11,6 +11,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:setup": "prisma db push && tsx prisma/seed.ts",
     "verify:users": "tsx scripts/verify-demo-users.ts",
+    "seed:cigarros-test": "tsx scripts/seed-cigarros-test-import.ts",
+    "cleanup:non-cigarros": "tsx scripts/cleanup-non-cigarros-catalog.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
