@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getProducts, getCategories } from "@/actions/inventory";
+import { getProducts } from "@/actions/inventory";
+import { suggestProducts } from "@/actions/suggest";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -11,9 +12,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
-import { Plus, Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Plus } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
+import { LiveSearchFilter } from "@/components/ui/live-search-filter";
 
 export default async function ProductsPage({
   searchParams,
@@ -37,15 +38,16 @@ export default async function ProductsPage({
         </Link>
       </PageHeader>
 
-      <form className="app-search-form">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input name="q" defaultValue={q} placeholder="Buscar SKU, GTIN, marca..." className="pl-9" />
-        </div>
-        <Button type="submit" variant="secondary">
-          Buscar
-        </Button>
-      </form>
+      <div className="app-search-form">
+        <LiveSearchFilter
+          basePath="/products"
+          hrefPrefix="/products"
+          initialQuery={q}
+          placeholder="Buscar SKU, GTIN, marca..."
+          fetchSuggestions={suggestProducts}
+          className="flex-1"
+        />
+      </div>
 
       <div className="rounded-lg border border-border bg-surface">
         <Table>

@@ -22,10 +22,10 @@ export async function getProducts(search?: string) {
     where: search
       ? {
           OR: [
-            { sku: { contains: search } },
-            { name: { contains: search } },
-            { brand: { contains: search } },
-            { gtin: { contains: search } },
+            { sku: { contains: search, mode: "insensitive" } },
+            { name: { contains: search, mode: "insensitive" } },
+            { brand: { contains: search, mode: "insensitive" } },
+            { gtin: { contains: search, mode: "insensitive" } },
           ],
         }
       : undefined,
@@ -149,9 +149,9 @@ export async function getLots(search?: string) {
     where: search
       ? {
           OR: [
-            { lotNumber: { contains: search } },
-            { product: { name: { contains: search } } },
-            { product: { sku: { contains: search } } },
+            { lotNumber: { contains: search, mode: "insensitive" } },
+            { product: { name: { contains: search, mode: "insensitive" } } },
+            { product: { sku: { contains: search, mode: "insensitive" } } },
           ],
         }
       : undefined,

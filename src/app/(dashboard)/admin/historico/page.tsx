@@ -1,4 +1,5 @@
 import { getAuditLogs } from "@/actions/audit-log";
+import { suggestAuditLogs } from "@/actions/suggest";
 import { AUDIT_ACTION_LABELS, AUDIT_ENTITY_LABELS } from "@/lib/audit";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -15,6 +16,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { formatAuditChanges } from "@/lib/audit";
 import { formatDateTime } from "@/lib/utils";
 import type { AuditAction } from "@prisma/client";
+import { LiveSearchFilter } from "@/components/ui/live-search-filter";
 
 const ENTITY_TYPES = Object.keys(AUDIT_ENTITY_LABELS);
 
@@ -46,9 +48,20 @@ export default async function AuditHistoricoPage({
       />
 
       <form className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
-        <div className="space-y-1 lg:min-w-[200px]">
+        <div className="space-y-1 sm:col-span-2 lg:min-w-[240px] lg:flex-1">
           <label className="text-sm font-medium">Buscar</label>
-          <Input name="q" defaultValue={params.q} placeholder="Usuario, resumen, entidad..." />
+          <LiveSearchFilter
+            basePath="/admin/historico"
+            initialQuery={params.q}
+            preserveParams={{
+              entityType: params.entityType,
+              action: params.action,
+              dateFrom: params.dateFrom,
+              dateTo: params.dateTo,
+            }}
+            placeholder="Usuario, resumen, entidad..."
+            fetchSuggestions={suggestAuditLogs}
+          />
         </div>
         <div className="space-y-1">
           <label className="text-sm font-medium">Desde</label>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition, useEffect } from "react";
 import { searchProductsForSale, createSale, type CartItem } from "@/actions/sales";
 import { getCustomerCreditProfile, type CustomerCreditProfile } from "@/actions/credit";
 import { Button } from "@/components/ui/button";
@@ -13,25 +13,40 @@ import { buildInstallmentPreview, formatCents, toCents } from "@/lib/money";
 import { CreditPeriodUnit, PaymentMethod, SaleType } from "@prisma/client";
 import { Trash2 } from "lucide-react";
 import { CreditRatingBadge } from "@/components/credit/credit-rating-badge";
+import { LiveSearch, type LiveSearchItem } from "@/components/ui/live-search";
 
 type Customer = { id: string; code: string; name: string };
 
 type SearchProduct = Awaited<ReturnType<typeof searchProductsForSale>>[number];
 
+function resetSaleFormState() {
+  return {
+    cart: [] as CartItem[],
+    customerId: "",
+    discount: 0,
+    saleType: SaleType.CONTADO as SaleType,
+    paymentMethod: "CASH" as PaymentMethod,
+    installmentCount: 4,
+    periodUnit: CreditPeriodUnit.WEEKS,
+    startDate: toDateKey(),
+  };
+}
+
 export function PosClient({ customers }: { customers: Customer[] }) {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchProduct[]>([]);
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [customerId, setCustomerId] = useState("");
-  const [discount, setDiscount] = useState(0);
-  const [saleType, setSaleType] = useState<SaleType>(SaleType.CONTADO);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
-  const [installmentCount, setInstallmentCount] = useState(4);
-  const [periodUnit, setPeriodUnit] = useState<CreditPeriodUnit>(CreditPeriodUnit.WEEKS);
-  const [startDate, setStartDate] = useState(() => toDateKey());
+  const initial = resetSaleFormState();
+  const [cart, setCart] = useState<CartItem[]>(initial.cart);
+  const [customerId, setCustomerId] = useState(initial.customerId);
+  const [discount, setDiscount] = useState(initial.discount);
+  const [saleType, setSaleType] = useState<SaleType>(initial.saleType);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(initial.paymentMethod);
+  const [installmentCount, setInstallmentCount] = useState(initial.installmentCount);
+  const [periodUnit, setPeriodUnit] = useState<CreditPeriodUnit>(initial.periodUnit);
+  const [startDate, setStartDate] = useState(initial.startDate);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [creditProfile, setCreditProfile] = useState<CustomerCreditProfile | null>(null);
+  const [searchResetKey, setSearchResetKey] = useState(0);
+  const productCache = useRef<Map<string, SearchProduct>>(new Map());
 
   useEffect(() => {
     if (!customerId || saleType !== SaleType.CREDITO) {
@@ -47,9 +62,21 @@ export function PosClient({ customers }: { customers: Customer[] }) {
     };
   }, [customerId, saleType]);
 
-  async function handleSearch() {
-    const products = await searchProductsForSale(query);
-    setResults(products);
+  async function fetchProductSuggestions(q: string): Promise<LiveSearchItem[]> {
+    const products = await searchProductsForSale(q);
+    const next = new Map<string, SearchProduct>();
+    const items = products.map((p) => {
+      next.set(p.id, p);
+      const stock = p.lots.reduce((s, l) => s + l.quantity, 0);
+      return {
+        id: p.id,
+        title: p.name,
+        subtitle: `${p.sku} · ${formatCurrency(p.salePrice)} · Stock: ${stock}`,
+        disabled: stock === 0,
+      };
+    });
+    productCache.current = next;
+    return items;
   }
 
   function addToCart(product: SearchProduct) {
@@ -121,8 +148,18 @@ export function PosClient({ customers }: { customers: Customer[] }) {
       if (result.error) {
         setMessage(result.error);
       } else {
-        setCart([]);
-        setDiscount(0);
+        const next = resetSaleFormState();
+        setCart(next.cart);
+        setCustomerId(next.customerId);
+        setDiscount(next.discount);
+        setSaleType(next.saleType);
+        setPaymentMethod(next.paymentMethod);
+        setInstallmentCount(next.installmentCount);
+        setPeriodUnit(next.periodUnit);
+        setStartDate(next.startDate);
+        setCreditProfile(null);
+        productCache.current.clear();
+        setSearchResetKey((k) => k + 1);
         const extra =
           result.creditPlanNumber ? ` — Cartera ${result.creditPlanNumber}` : "";
         setMessage(`Venta ${result.saleNumber} registrada${extra}`);
@@ -137,43 +174,20 @@ export function PosClient({ customers }: { customers: Customer[] }) {
           <CardTitle>Buscar producto</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="SKU, nombre, código de barras..."
-              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleSearch())}
-            />
-            <Button type="button" onClick={handleSearch} className="shrink-0 sm:w-auto">
-              Buscar
-            </Button>
-          </div>
-          <ul className="max-h-80 space-y-2 overflow-auto">
-            {results.map((p) => {
-              const stock = p.lots.reduce((s, l) => s + l.quantity, 0);
-              return (
-                <li
-                  key={p.id}
-                  className="flex flex-col gap-3 rounded-md border border-border p-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div>
-                    <p className="font-medium">{p.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {p.sku} · {formatCurrency(p.salePrice)} · Stock: {stock}
-                    </p>
-                    {p.lots[0] && (
-                      <p className="text-xs text-muted-foreground">
-                        Lote FIFO: {p.lots[0].lotNumber}
-                      </p>
-                    )}
-                  </div>
-                  <Button size="sm" className="w-full sm:w-auto" onClick={() => addToCart(p)} disabled={stock === 0}>
-                    Agregar
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
+          <LiveSearch
+            key={searchResetKey}
+            resetKey={searchResetKey}
+            placeholder="SKU, nombre, código de barras..."
+            showSubmitButton={false}
+            fetchSuggestions={fetchProductSuggestions}
+            onSelect={(item) => {
+              const product = productCache.current.get(item.id);
+              if (product) addToCart(product);
+            }}
+          />
+          <p className="text-xs text-muted-foreground">
+            Escribe para ver sugerencias y haz clic para agregar al carrito.
+          </p>
         </CardContent>
       </Card>
 

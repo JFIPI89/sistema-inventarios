@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSales } from "@/actions/sales";
+import { suggestSales } from "@/actions/suggest";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -13,8 +14,8 @@ import {
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { SALE_TYPE_LABELS } from "@/lib/credit-labels";
 import { Plus } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/layout/page-header";
+import { LiveSearchFilter } from "@/components/ui/live-search-filter";
 
 export default async function SalesPage({
   searchParams,
@@ -35,12 +36,16 @@ export default async function SalesPage({
         </Link>
       </PageHeader>
 
-      <form className="app-search-form">
-        <Input name="q" defaultValue={q} placeholder="Buscar venta o cliente..." className="flex-1" />
-        <Button type="submit" variant="secondary">
-          Buscar
-        </Button>
-      </form>
+      <div className="app-search-form">
+        <LiveSearchFilter
+          basePath="/sales"
+          hrefPrefix="/sales"
+          initialQuery={q}
+          placeholder="Buscar venta o cliente..."
+          fetchSuggestions={suggestSales}
+          className="flex-1"
+        />
+      </div>
 
       <div className="rounded-lg border border-border bg-surface">
         <Table>

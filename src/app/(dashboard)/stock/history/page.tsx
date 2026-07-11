@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getStockMovements } from "@/actions/stock-history";
+import { suggestStockMovements } from "@/actions/suggest";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -13,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
+import { LiveSearchFilter } from "@/components/ui/live-search-filter";
 
 export default async function StockHistoryPage({
   searchParams,
@@ -46,9 +48,21 @@ export default async function StockHistoryPage({
       <form className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
         {params.productId && <input type="hidden" name="productId" value={params.productId} />}
         {params.lotId && <input type="hidden" name="lotId" value={params.lotId} />}
-        <div className="space-y-1">
+        <div className="space-y-1 sm:col-span-2 lg:min-w-[280px] lg:flex-1">
           <label className="text-sm font-medium">Buscar</label>
-          <Input name="q" defaultValue={params.q} placeholder="SKU, lote, referencia..." />
+          <LiveSearchFilter
+            basePath="/stock/history"
+            initialQuery={params.q}
+            preserveParams={{
+              productId: params.productId,
+              lotId: params.lotId,
+              dateFrom: params.dateFrom,
+              dateTo: params.dateTo,
+              type: params.type,
+            }}
+            placeholder="SKU, lote, referencia..."
+            fetchSuggestions={suggestStockMovements}
+          />
         </div>
         <div className="space-y-1">
           <label className="text-sm font-medium">Desde</label>

@@ -30,9 +30,9 @@ export async function getCustomers(search?: string) {
     where: search
       ? {
           OR: [
-            { name: { contains: search } },
-            { code: { contains: search } },
-            { email: { contains: search } },
+            { name: { contains: search, mode: "insensitive" } },
+            { code: { contains: search, mode: "insensitive" } },
+            { email: { contains: search, mode: "insensitive" } },
           ],
         }
       : undefined,
@@ -144,16 +144,17 @@ export type CartItem = {
 };
 
 export async function searchProductsForSale(query: string) {
-  if (!query.trim()) return [];
+  const q = query.trim();
+  if (!q) return [];
 
   return prisma.product.findMany({
     where: {
       isActive: true,
       OR: [
-        { sku: { contains: query } },
-        { name: { contains: query } },
-        { barcode: { contains: query } },
-        { gtin: { contains: query } },
+        { sku: { contains: q, mode: "insensitive" } },
+        { name: { contains: q, mode: "insensitive" } },
+        { barcode: { contains: q, mode: "insensitive" } },
+        { gtin: { contains: q, mode: "insensitive" } },
       ],
     },
     include: {
@@ -331,8 +332,8 @@ export async function getSales(search?: string) {
     where: search
       ? {
           OR: [
-            { saleNumber: { contains: search } },
-            { customer: { name: { contains: search } } },
+            { saleNumber: { contains: search, mode: "insensitive" } },
+            { customer: { name: { contains: search, mode: "insensitive" } } },
           ],
         }
       : undefined,

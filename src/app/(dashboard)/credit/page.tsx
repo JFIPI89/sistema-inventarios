@@ -12,7 +12,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/layout/page-header";
-import { Input } from "@/components/ui/input";
 import { Plus } from "lucide-react";
 import { formatCents } from "@/lib/money";
 import { formatDate } from "@/lib/utils";
@@ -23,6 +22,8 @@ import { CreditDashboard } from "@/components/credit/credit-dashboard";
 import { CreditReportsView } from "@/components/credit/credit-reports-view";
 import { CreditRatingBadge } from "@/components/credit/credit-rating-badge";
 import { defaultDateRangeDays } from "@/lib/timezone";
+import { LiveSearchFilter } from "@/components/ui/live-search-filter";
+import { suggestCreditPlans } from "@/actions/suggest";
 
 function planPaidCents(installments: { paidCents: number }[]) {
   return installments.reduce((s, i) => s + i.paidCents, 0);
@@ -98,23 +99,34 @@ export default async function CreditPage({
 
       {view === "planes" && (
         <>
-          <form className="app-search-form flex flex-wrap gap-2">
-            <input type="hidden" name="view" value="planes" />
-            <Input name="q" defaultValue={q} placeholder="Buscar plan o cliente..." className="flex-1" />
-            <select
-              name="status"
-              defaultValue={status ?? ""}
-              className="h-10 rounded-md border border-border bg-surface px-3 text-sm"
-            >
-              <option value="">Todos los estados</option>
-              <option value="ACTIVE">Activos</option>
-              <option value="PAID">Pagados</option>
-              <option value="CANCELLED">Cancelados</option>
-            </select>
-            <Button type="submit" variant="secondary">
-              Buscar
-            </Button>
-          </form>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start">
+            <LiveSearchFilter
+              basePath="/credit"
+              hrefPrefix="/credit"
+              initialQuery={q}
+              preserveParams={{ view: "planes", status }}
+              placeholder="Buscar plan o cliente..."
+              fetchSuggestions={suggestCreditPlans}
+              className="flex-1"
+            />
+            <form className="flex flex-wrap gap-2">
+              <input type="hidden" name="view" value="planes" />
+              {q ? <input type="hidden" name="q" value={q} /> : null}
+              <select
+                name="status"
+                defaultValue={status ?? ""}
+                className="h-10 rounded-md border border-border bg-surface px-3 text-sm"
+              >
+                <option value="">Todos los estados</option>
+                <option value="ACTIVE">Activos</option>
+                <option value="PAID">Pagados</option>
+                <option value="CANCELLED">Cancelados</option>
+              </select>
+              <Button type="submit" variant="secondary">
+                Filtrar
+              </Button>
+            </form>
+          </div>
 
           <div className="rounded-lg border border-border bg-surface">
             <Table>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getLots } from "@/actions/inventory";
+import { suggestLots } from "@/actions/suggest";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -12,8 +13,8 @@ import {
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/utils";
 import { Plus } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/layout/page-header";
+import { LiveSearchFilter } from "@/components/ui/live-search-filter";
 
 export default async function LotsPage({
   searchParams,
@@ -40,12 +41,16 @@ export default async function LotsPage({
         </Link>
       </PageHeader>
 
-      <form className="app-search-form">
-        <Input name="q" defaultValue={q} placeholder="Buscar lote, producto..." />
-        <Button type="submit" variant="secondary">
-          Buscar
-        </Button>
-      </form>
+      <div className="app-search-form">
+        <LiveSearchFilter
+          basePath="/lots"
+          hrefPrefix="/lots"
+          initialQuery={q}
+          placeholder="Buscar lote, producto..."
+          fetchSuggestions={suggestLots}
+          className="flex-1"
+        />
+      </div>
 
       <div className="rounded-lg border border-border bg-surface">
         <Table>
