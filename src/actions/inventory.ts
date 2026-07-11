@@ -9,6 +9,26 @@ import { StockMovementType } from "@prisma/client";
 import { buildChanges, logAudit } from "@/lib/audit";
 import { parseAppDate } from "@/lib/timezone";
 
+/** Single barcode/GTIN field → gtin (if valid) + barcode mirror, else barcode only. */
+function resolveBarcodeFields(raw: string): { gtin: string | null; barcode: string | null } {
+  const code = raw.trim();
+  if (!code) return { gtin: null, barcode: null };
+  const normalized = normalizeGtin(code);
+  if (validateGtin(code) || validateGtin(normalized)) {
+    return { gtin: normalized, barcode: normalized };
+  }
+  return { gtin: null, barcode: code };
+}
+
+function parseOptionalPrice(formData: FormData, key: string): number | null {
+  if (!formData.has(key)) return null;
+  const raw = String(formData.get(key) ?? "").trim();
+  if (raw === "") return null;
+  const n = parseFloat(raw.replace(",", "."));
+  if (Number.isNaN(n) || n < 0) return null;
+  return n;
+}
+
 async function requireProductWrite() {
   const session = await getSession();
   if (!session || !canWriteProducts(session.role)) {
@@ -49,11 +69,9 @@ export async function createProduct(formData: FormData) {
 
   const sku = String(formData.get("sku") || "").trim();
   const name = String(formData.get("name") || "").trim();
-  const gtinRaw = String(formData.get("gtin") || "").trim();
-  const gtin = gtinRaw ? normalizeGtin(gtinRaw) : null;
+  const { gtin, barcode } = resolveBarcodeFields(String(formData.get("barcode") || ""));
 
   if (!sku || !name) return { error: "SKU y nombre son requeridos" };
-  if (gtin && !validateGtin(gtin)) return { error: "GTIN inválido (AI 01)" };
 
   const product = await prisma.product.create({
     data: {
@@ -67,7 +85,7 @@ export async function createProduct(formData: FormData) {
       costPrice: parseFloat(String(formData.get("costPrice") || "0")) || 0,
       salePrice: parseFloat(String(formData.get("salePrice") || "0")) || 0,
       minStock: parseInt(String(formData.get("minStock") || "0"), 10) || 0,
-      barcode: String(formData.get("barcode") || "").trim() || gtin,
+      barcode,
     },
   });
 
@@ -91,9 +109,7 @@ export async function updateProduct(id: string, formData: FormData) {
   const before = await prisma.product.findUnique({ where: { id } });
   if (!before) return { error: "Producto no encontrado" };
 
-  const gtinRaw = String(formData.get("gtin") || "").trim();
-  const gtin = gtinRaw ? normalizeGtin(gtinRaw) : null;
-  if (gtin && !validateGtin(gtin)) return { error: "GTIN inválido (AI 01)" };
+  const { gtin, barcode } = resolveBarcodeFields(String(formData.get("barcode") || ""));
 
   const afterData = {
     sku: String(formData.get("sku") || "").trim(),
@@ -106,7 +122,7 @@ export async function updateProduct(id: string, formData: FormData) {
     costPrice: parseFloat(String(formData.get("costPrice") || "0")) || 0,
     salePrice: parseFloat(String(formData.get("salePrice") || "0")) || 0,
     minStock: parseInt(String(formData.get("minStock") || "0"), 10) || 0,
-    barcode: String(formData.get("barcode") || "").trim() || gtin,
+    barcode,
     isActive: formData.get("isActive") === "on",
   };
 
@@ -175,6 +191,15 @@ export async function createLot(formData: FormData) {
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product) return { error: "Producto no encontrado" };
 
+  const costPrice = parseOptionalPrice(formData, "costPrice");
+  const salePrice = parseOptionalPrice(formData, "salePrice");
+  if (formData.has("costPrice") && costPrice === null && String(formData.get("costPrice") || "").trim() !== "") {
+    return { error: "Precio costo inválido" };
+  }
+  if (formData.has("salePrice") && salePrice === null && String(formData.get("salePrice") || "").trim() !== "") {
+    return { error: "Precio venta inválido" };
+  }
+
   const productionDate = formData.get("productionDate")
     ? parseAppDate(String(formData.get("productionDate")))
     : null;
@@ -185,31 +210,43 @@ export async function createLot(formData: FormData) {
     ? parseAppDate(String(formData.get("bestBeforeDate")))
     : null;
 
-  const lot = await prisma.lot.create({
-    data: {
-      productId,
-      lotNumber,
-      serialNumber: String(formData.get("serialNumber") || "").trim() || null,
-      productionDate,
-      expirationDate,
-      bestBeforeDate,
-      quantity,
-      location: String(formData.get("location") || "").trim() || null,
-      supplierId,
-    },
-  });
+  const priceUpdate: { costPrice?: number; salePrice?: number } = {};
+  if (costPrice !== null) priceUpdate.costPrice = costPrice;
+  if (salePrice !== null) priceUpdate.salePrice = salePrice;
 
-  if (quantity > 0) {
-    await prisma.stockMovement.create({
+  const lot = await prisma.$transaction(async (tx) => {
+    if (Object.keys(priceUpdate).length > 0) {
+      await tx.product.update({ where: { id: productId }, data: priceUpdate });
+    }
+
+    const created = await tx.lot.create({
       data: {
         productId,
-        lotId: lot.id,
-        type: StockMovementType.IN,
+        lotNumber,
+        serialNumber: String(formData.get("serialNumber") || "").trim() || null,
+        productionDate,
+        expirationDate,
+        bestBeforeDate,
         quantity,
-        reference: "Entrada inicial",
+        location: String(formData.get("location") || "").trim() || null,
+        supplierId,
       },
     });
-  }
+
+    if (quantity > 0) {
+      await tx.stockMovement.create({
+        data: {
+          productId,
+          lotId: created.id,
+          type: StockMovementType.IN,
+          quantity,
+          reference: "Entrada inicial",
+        },
+      });
+    }
+
+    return created;
+  });
 
   await logAudit({
     session,
@@ -218,7 +255,13 @@ export async function createLot(formData: FormData) {
     entityId: lot.id,
     entityLabel: `${product.sku} / ${lotNumber}`,
     summary: `Entrada de stock: ${quantity} pzas en lote ${lotNumber} (${product.sku})`,
-    changes: { quantity, lotNumber, supplierId, location: lot.location },
+    changes: {
+      quantity,
+      lotNumber,
+      supplierId,
+      location: lot.location,
+      ...(Object.keys(priceUpdate).length > 0 ? { prices: priceUpdate } : {}),
+    },
   });
 
   revalidatePath("/lots");
@@ -242,14 +285,30 @@ export async function receiveLotStock(lotId: string, formData: FormData) {
   });
   if (!lot) return { error: "Lote no encontrado" };
 
+  const costPrice = parseOptionalPrice(formData, "costPrice");
+  const salePrice = parseOptionalPrice(formData, "salePrice");
+  if (formData.has("costPrice") && costPrice === null && String(formData.get("costPrice") || "").trim() !== "") {
+    return { error: "Precio costo inválido" };
+  }
+  if (formData.has("salePrice") && salePrice === null && String(formData.get("salePrice") || "").trim() !== "") {
+    return { error: "Precio venta inválido" };
+  }
+
+  const priceUpdate: { costPrice?: number; salePrice?: number } = {};
+  if (costPrice !== null) priceUpdate.costPrice = costPrice;
+  if (salePrice !== null) priceUpdate.salePrice = salePrice;
+
   const qtyBefore = lot.quantity;
 
-  await prisma.$transaction([
-    prisma.lot.update({
+  await prisma.$transaction(async (tx) => {
+    if (Object.keys(priceUpdate).length > 0) {
+      await tx.product.update({ where: { id: lot.productId }, data: priceUpdate });
+    }
+    await tx.lot.update({
       where: { id: lotId },
       data: { quantity: lot.quantity + quantity },
-    }),
-    prisma.stockMovement.create({
+    });
+    await tx.stockMovement.create({
       data: {
         productId: lot.productId,
         lotId,
@@ -258,8 +317,8 @@ export async function receiveLotStock(lotId: string, formData: FormData) {
         reference,
         notes,
       },
-    }),
-  ]);
+    });
+  });
 
   await logAudit({
     session,
@@ -268,11 +327,10 @@ export async function receiveLotStock(lotId: string, formData: FormData) {
     entityId: lotId,
     entityLabel: `${lot.product.sku} / ${lot.lotNumber}`,
     summary: `Recibió ${quantity} pzas en lote ${lot.lotNumber} (${reference})`,
-    changes: buildChanges(
-      { quantity: qtyBefore },
-      { quantity: qtyBefore + quantity },
-      ["quantity"]
-    ),
+    changes: {
+      ...buildChanges({ quantity: qtyBefore }, { quantity: qtyBefore + quantity }, ["quantity"]),
+      ...(Object.keys(priceUpdate).length > 0 ? { prices: priceUpdate } : {}),
+    },
   });
 
   revalidatePath("/lots");

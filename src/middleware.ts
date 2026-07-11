@@ -28,6 +28,7 @@ export async function middleware(request: NextRequest) {
     "/stock": ["ADMIN", "WAREHOUSE"],
     "/customers": ["ADMIN", "SELLER"],
     "/sales": ["ADMIN", "SELLER"],
+    "/credit": ["ADMIN", "SELLER"],
     "/reports": ["ADMIN"],
     "/admin": ["ADMIN"],
   };

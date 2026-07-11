@@ -117,18 +117,15 @@ export async function createCreditPlanManual(data: {
 }) {
   const session = await requireSalesWrite();
 
-  const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
-  if (!customer) return { error: "Cliente no encontrado" };
-
   const startDate = parseAppDate(data.startDate);
   if (Number.isNaN(startDate.getTime())) return { error: "Fecha inválida" };
 
   const totalCents = toCents(data.totalAmount);
 
   try {
-    await assertCreditLimit(data.customerId, totalCents);
-    const plan = await prisma.$transaction((tx) =>
-      createCreditPlanInTx(tx, {
+    const plan = await prisma.$transaction(async (tx) => {
+      await assertCreditLimit(data.customerId, totalCents, tx);
+      return createCreditPlanInTx(tx, {
         customerId: data.customerId,
         totalCents,
         installmentCount: data.installmentCount,
@@ -136,8 +133,8 @@ export async function createCreditPlanManual(data: {
         startDate,
         notes: data.notes,
         createdById: session.id,
-      })
-    );
+      });
+    });
 
     await logAudit({
       session,
@@ -357,11 +354,27 @@ export async function cancelCreditPlan(id: string) {
   return { success: true };
 }
 
-export async function assertCreditLimit(customerId: string, newAmountCents: number) {
-  const customer = await prisma.customer.findUnique({ where: { id: customerId } });
-  if (!customer?.creditLimitCents) return;
+export async function assertCreditLimit(
+  customerId: string,
+  newAmountCents: number,
+  db: Prisma.TransactionClient | typeof prisma = prisma
+) {
+  const customer = await db.customer.findUnique({ where: { id: customerId } });
+  if (!customer) throw new Error("Cliente no encontrado");
+  if (!customer.isActive) throw new Error("El cliente está inactivo");
+  if (customer.creditLimitCents == null) return;
 
-  const used = await getCustomerOutstandingCents(customerId);
+  const plans = await db.creditPlan.findMany({
+    where: { customerId, status: CreditPlanStatus.ACTIVE },
+    include: { installments: true },
+  });
+  let used = 0;
+  for (const plan of plans) {
+    for (const inst of plan.installments) {
+      used += Math.max(0, inst.amountCents - inst.paidCents);
+    }
+  }
+
   const limit = customer.creditLimitCents;
   const available = Math.max(0, limit - used);
 

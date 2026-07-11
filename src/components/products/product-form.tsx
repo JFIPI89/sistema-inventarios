@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { GS1_FIELD_LABELS } from "@/lib/gs1";
 import { useRouter } from "next/navigation";
 
 type Category = { id: string; name: string };
@@ -51,6 +50,8 @@ export function ProductForm({
     }
   }
 
+  const barcodeDefault = product?.gtin || product?.barcode || "";
+
   return (
     <Card>
       <CardContent className="pt-6">
@@ -61,8 +62,13 @@ export function ProductForm({
               <Input id="sku" name="sku" defaultValue={product?.sku} required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="gtin">{GS1_FIELD_LABELS.gtin}</Label>
-              <Input id="gtin" name="gtin" defaultValue={product?.gtin || ""} placeholder="14 dígitos" />
+              <Label htmlFor="barcode">Código de barras / GTIN</Label>
+              <Input
+                id="barcode"
+                name="barcode"
+                defaultValue={barcodeDefault}
+                placeholder="EAN/UPC o código interno"
+              />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="name">Nombre *</Label>
@@ -95,10 +101,6 @@ export function ProductForm({
             <div className="space-y-2">
               <Label htmlFor="unitOfMeasure">Unidad</Label>
               <Input id="unitOfMeasure" name="unitOfMeasure" defaultValue={product?.unitOfMeasure || "pza"} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="barcode">Código de barras</Label>
-              <Input id="barcode" name="barcode" defaultValue={product?.barcode || ""} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="costPrice">Precio costo</Label>

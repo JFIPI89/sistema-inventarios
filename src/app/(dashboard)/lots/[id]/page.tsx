@@ -6,7 +6,7 @@ import { LotAdjustForm } from "@/components/lots/lot-adjust-form";
 import { LotReceiveForm } from "@/components/lots/lot-receive-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/page-header";
 
 export default async function LotDetailPage({
@@ -48,6 +48,14 @@ export default async function LotDetailPage({
             <span className="text-muted-foreground">Stock actual:</span> {lot.quantity}
           </p>
           <p>
+            <span className="text-muted-foreground">Precio costo:</span>{" "}
+            {formatCurrency(lot.product.costPrice)}
+          </p>
+          <p>
+            <span className="text-muted-foreground">Precio venta:</span>{" "}
+            {formatCurrency(lot.product.salePrice)}
+          </p>
+          <p>
             <span className="text-muted-foreground">Proveedor:</span> {lot.supplier?.name || "—"}
           </p>
           <p>
@@ -59,7 +67,12 @@ export default async function LotDetailPage({
           </p>
         </CardContent>
       </Card>
-      <LotReceiveForm action={receiveAction} currentQty={lot.quantity} />
+      <LotReceiveForm
+        action={receiveAction}
+        currentQty={lot.quantity}
+        costPrice={lot.product.costPrice}
+        salePrice={lot.product.salePrice}
+      />
       <LotAdjustForm action={adjustAction} currentQty={lot.quantity} />
     </div>
   );

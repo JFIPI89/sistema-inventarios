@@ -15,7 +15,7 @@ import { Trash2 } from "lucide-react";
 import { CreditRatingBadge } from "@/components/credit/credit-rating-badge";
 import { LiveSearch, type LiveSearchItem } from "@/components/ui/live-search";
 
-type Customer = { id: string; code: string; name: string };
+type Customer = { id: string; code: string; name: string; isActive: boolean };
 
 type SearchProduct = Awaited<ReturnType<typeof searchProductsForSale>>[number];
 
@@ -120,6 +120,22 @@ export function PosClient({ customers }: { customers: Customer[] }) {
   const subtotal = cart.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
   const total = Math.max(0, subtotal - discount);
   const totalCents = toCents(total);
+  const selectedCustomer = customers.find((c) => c.id === customerId);
+
+  const creditBlockReason = useMemo(() => {
+    if (saleType !== SaleType.CREDITO) return null;
+    if (!customerId) return "Seleccione un cliente para venta a crédito";
+    if (selectedCustomer && !selectedCustomer.isActive) {
+      return "El cliente está inactivo; no se puede registrar crédito";
+    }
+    if (
+      creditProfile?.availableCents != null &&
+      totalCents > creditProfile.availableCents
+    ) {
+      return `El total excede el crédito disponible (${formatCents(creditProfile.availableCents)})`;
+    }
+    return null;
+  }, [saleType, customerId, selectedCustomer, creditProfile, totalCents]);
 
   const preview = useMemo(() => {
     if (saleType !== SaleType.CREDITO || totalCents <= 0) return [];
@@ -129,8 +145,8 @@ export function PosClient({ customers }: { customers: Customer[] }) {
   }, [saleType, totalCents, installmentCount, periodUnit, startDate]);
 
   function handleCheckout() {
-    if (saleType === SaleType.CREDITO && !customerId) {
-      setMessage("Seleccione un cliente para venta a crédito");
+    if (creditBlockReason) {
+      setMessage(creditBlockReason);
       return;
     }
 
@@ -207,6 +223,7 @@ export function PosClient({ customers }: { customers: Customer[] }) {
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.code} — {c.name}
+                  {!c.isActive ? " (Inactivo)" : ""}
                 </option>
               ))}
             </select>
@@ -348,13 +365,21 @@ export function PosClient({ customers }: { customers: Customer[] }) {
             </div>
           </div>
 
+          {saleType === SaleType.CREDITO && creditBlockReason && (
+            <p className="text-sm text-destructive">{creditBlockReason}</p>
+          )}
+
           {message && (
             <p className={`text-sm ${message.includes("registrada") ? "text-success" : "text-destructive"}`}>
               {message}
             </p>
           )}
 
-          <Button className="w-full" disabled={cart.length === 0 || isPending} onClick={handleCheckout}>
+          <Button
+            className="w-full"
+            disabled={cart.length === 0 || isPending || !!creditBlockReason}
+            onClick={handleCheckout}
+          >
             {isPending ? "Procesando..." : saleType === SaleType.CREDITO ? "Registrar crédito" : "Cobrar"}
           </Button>
         </CardContent>

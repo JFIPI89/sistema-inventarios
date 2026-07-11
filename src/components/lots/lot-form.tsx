@@ -7,9 +7,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { GS1_FIELD_LABELS } from "@/lib/gs1";
+import { formatCurrency } from "@/lib/utils";
 
-type Product = { id: string; sku: string; name: string };
+type Product = {
+  id: string;
+  sku: string;
+  name: string;
+  costPrice: number;
+  salePrice: number;
+};
 type Supplier = { id: string; name: string };
+
+function pricesFromProduct(products: Product[], id: string) {
+  const p = products.find((x) => x.id === id);
+  return {
+    costPrice: p ? String(p.costPrice) : "",
+    salePrice: p ? String(p.salePrice) : "",
+  };
+}
 
 export function LotForm({
   products,
@@ -25,6 +40,29 @@ export function LotForm({
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const initialId = defaultProductId || "";
+  const initialPrices = pricesFromProduct(products, initialId);
+  const [productId, setProductId] = useState(initialId);
+  const [costPrice, setCostPrice] = useState(initialPrices.costPrice);
+  const [salePrice, setSalePrice] = useState(initialPrices.salePrice);
+  const selected = products.find((p) => p.id === productId);
+
+  function handleProductChange(id: string) {
+    setProductId(id);
+    const next = pricesFromProduct(products, id);
+    setCostPrice(next.costPrice);
+    setSalePrice(next.salePrice);
+  }
+
+  const costNum = parseFloat(costPrice.replace(",", ".")) || 0;
+  const saleNum = parseFloat(salePrice.replace(",", ".")) || 0;
+  const priceWarning =
+    productId &&
+    (saleNum <= 0
+      ? "El precio de venta es 0; no se podrá vender este producto en POS hasta corregirlo."
+      : saleNum < costNum
+        ? "El precio de venta es menor que el costo."
+        : null);
 
   async function handleSubmit(formData: FormData) {
     setLoading(true);
@@ -49,7 +87,8 @@ export function LotForm({
               id="productId"
               name="productId"
               required
-              defaultValue={defaultProductId || ""}
+              value={productId}
+              onChange={(e) => handleProductChange(e.target.value)}
               className="flex h-10 w-full rounded-md border border-border bg-surface px-3 text-sm"
             >
               <option value="">Seleccionar...</option>
@@ -60,6 +99,43 @@ export function LotForm({
               ))}
             </select>
           </div>
+          {selected && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="costPrice">Precio costo</Label>
+                <Input
+                  id="costPrice"
+                  name="costPrice"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={costPrice}
+                  onChange={(e) => setCostPrice(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Actual: {formatCurrency(selected.costPrice)}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="salePrice">Precio venta</Label>
+                <Input
+                  id="salePrice"
+                  name="salePrice"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={salePrice}
+                  onChange={(e) => setSalePrice(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Actual: {formatCurrency(selected.salePrice)}
+                </p>
+              </div>
+              {priceWarning && (
+                <p className="text-sm text-warning md:col-span-2">{priceWarning}</p>
+              )}
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="supplierId">Proveedor</Label>
             <select

@@ -54,7 +54,7 @@ export default async function ProductsPage({
           <TableHeader>
             <TableRow>
               <TableHead>SKU</TableHead>
-              <TableHead>GTIN</TableHead>
+              <TableHead>Código / GTIN</TableHead>
               <TableHead>Nombre</TableHead>
               <TableHead>Marca</TableHead>
               <TableHead>Categoría</TableHead>
@@ -71,7 +71,7 @@ export default async function ProductsPage({
               return (
                 <TableRow key={p.id}>
                   <TableCell className="font-mono text-xs">{p.sku}</TableCell>
-                  <TableCell className="font-mono text-xs">{p.gtin || "—"}</TableCell>
+                  <TableCell className="font-mono text-xs">{p.gtin || p.barcode || "—"}</TableCell>
                   <TableCell>{p.name}</TableCell>
                   <TableCell>{p.brand || "—"}</TableCell>
                   <TableCell>{p.category?.name || "—"}</TableCell>

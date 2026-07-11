@@ -21,7 +21,9 @@ export default function ImportProductsPage() {
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
             Columnas: sku, name, brand, gtin, costPrice, salePrice, minStock, unitOfMeasure,
-            category, description, barcode. Los productos existentes se actualizan por SKU.
+            category, description, barcode. Use gtin o barcode (un solo código): si es GTIN
+            válido se guarda normalizado en ambos; si no, solo como código de barras. Los
+            productos existentes se actualizan por SKU.
           </p>
           <a
             href={`data:text/csv;charset=utf-8,${encodeURIComponent(CSV_TEMPLATE)}`}

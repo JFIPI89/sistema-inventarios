@@ -79,10 +79,19 @@ export async function importProductsCsv(formData: FormData) {
     }
 
     const gtinRaw = col("gtin") >= 0 ? cells[col("gtin")]?.trim() : "";
-    const gtin = gtinRaw ? normalizeGtin(gtinRaw) : null;
-    if (gtin && !validateGtin(gtin)) {
-      results.push({ row: rowNum, sku, status: "error", message: "GTIN inválido" });
-      continue;
+    const barcodeRaw = col("barcode") >= 0 ? cells[col("barcode")]?.trim() : "";
+    const codeRaw = gtinRaw || barcodeRaw || "";
+    let gtin: string | null = null;
+    let barcode: string | null = null;
+    if (codeRaw) {
+      const normalized = normalizeGtin(codeRaw);
+      if (validateGtin(codeRaw) || validateGtin(normalized)) {
+        gtin = normalized;
+        barcode = normalized;
+      } else {
+        barcode = codeRaw;
+        gtin = null;
+      }
     }
 
     const categoryName = col("category") >= 0 ? cells[col("category")]?.trim() : "";
@@ -106,7 +115,7 @@ export async function importProductsCsv(formData: FormData) {
       costPrice: col("costprice") >= 0 ? parseFloat(cells[col("costprice")] || "0") || 0 : 0,
       salePrice: col("saleprice") >= 0 ? parseFloat(cells[col("saleprice")] || "0") || 0 : 0,
       minStock: col("minstock") >= 0 ? parseInt(cells[col("minstock")] || "0", 10) || 0 : 0,
-      barcode: col("barcode") >= 0 ? cells[col("barcode")]?.trim() || gtin : gtin,
+      barcode,
     };
 
     try {

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { canWriteSales } from "@/lib/permissions";
-import { PaymentMethod, SaleStatus, SaleType, StockMovementType, CreditPeriodUnit, Role } from "@prisma/client";
+import { PaymentMethod, SaleStatus, SaleType, StockMovementType, CreditPeriodUnit, CreditPlanStatus, Role } from "@prisma/client";
 import { buildChanges, logAudit } from "@/lib/audit";
 import { assertCreditLimit, createCreditPlanInTx } from "@/actions/credit";
 import { toCents } from "@/lib/money";
@@ -198,32 +198,87 @@ export async function createSale(data: {
   }
 
   const saleNumber = await generateSaleNumber();
-  let subtotal = 0;
-
-  for (const item of data.items) {
-    subtotal += item.unitPrice * item.quantity;
-  }
-
   const discount = data.discount || 0;
-  const total = Math.max(0, subtotal - discount);
-  const totalCents = toCents(total);
   const creditStartDate = data.startDate ? parseAppDate(data.startDate) : startOfAppDay();
 
-  if (data.saleType === SaleType.CREDITO && totalCents <= 0) {
-    return { error: "El total debe ser mayor a cero para crédito" };
-  }
   if (data.saleType === SaleType.CREDITO && Number.isNaN(creditStartDate.getTime())) {
     return { error: "Fecha de primera cuota inválida" };
   }
 
   let creditPlanNumber: string | undefined;
+  let auditedTotal = 0;
+  let auditedItems: Array<{
+    product: string;
+    lot: string;
+    qty: number;
+    price: number;
+  }> = [];
 
   try {
-    if (data.saleType === SaleType.CREDITO && data.customerId) {
-      await assertCreditLimit(data.customerId, totalCents);
-    }
-
     await prisma.$transaction(async (tx) => {
+      let subtotal = 0;
+      const pricedItems: Array<{
+        productId: string;
+        lotId: string;
+        productName: string;
+        lotNumber: string;
+        quantity: number;
+        unitPrice: number;
+        lineTotal: number;
+        lotQty: number;
+      }> = [];
+
+      for (const item of data.items) {
+        const [lot, product] = await Promise.all([
+          tx.lot.findUnique({ where: { id: item.lotId } }),
+          tx.product.findUnique({ where: { id: item.productId } }),
+        ]);
+
+        if (!lot || !product) {
+          throw new Error(`Producto o lote no encontrado (${item.productName})`);
+        }
+        if (lot.productId !== item.productId) {
+          throw new Error(`El lote ${item.lotNumber} no corresponde al producto seleccionado`);
+        }
+        if (lot.quantity < item.quantity) {
+          throw new Error(`Stock insuficiente para ${product.name} / ${lot.lotNumber}`);
+        }
+        if (product.salePrice <= 0) {
+          throw new Error(`El producto ${product.name} no tiene precio de venta válido`);
+        }
+
+        const unitPrice = product.salePrice;
+        const lineTotal = unitPrice * item.quantity;
+        subtotal += lineTotal;
+        pricedItems.push({
+          productId: product.id,
+          lotId: lot.id,
+          productName: product.name,
+          lotNumber: lot.lotNumber,
+          quantity: item.quantity,
+          unitPrice,
+          lineTotal,
+          lotQty: lot.quantity,
+        });
+      }
+
+      const total = Math.max(0, subtotal - discount);
+      if (total <= 0) {
+        throw new Error("El total debe ser mayor a cero");
+      }
+      const totalCents = toCents(total);
+      auditedTotal = total;
+      auditedItems = pricedItems.map((i) => ({
+        product: i.productName,
+        lot: i.lotNumber,
+        qty: i.quantity,
+        price: i.unitPrice,
+      }));
+
+      if (data.saleType === SaleType.CREDITO && data.customerId) {
+        await assertCreditLimit(data.customerId, totalCents, tx);
+      }
+
       const sale = await tx.sale.create({
         data: {
           saleNumber,
@@ -239,15 +294,10 @@ export async function createSale(data: {
         },
       });
 
-      for (const item of data.items) {
-        const lot = await tx.lot.findUnique({ where: { id: item.lotId } });
-        if (!lot || lot.quantity < item.quantity) {
-          throw new Error(`Stock insuficiente para ${item.productName} / ${item.lotNumber}`);
-        }
-
+      for (const item of pricedItems) {
         await tx.lot.update({
           where: { id: item.lotId },
-          data: { quantity: lot.quantity - item.quantity },
+          data: { quantity: item.lotQty - item.quantity },
         });
 
         await tx.stockMovement.create({
@@ -267,7 +317,7 @@ export async function createSale(data: {
             lotId: item.lotId,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
-            lineTotal: item.unitPrice * item.quantity,
+            lineTotal: item.lineTotal,
           },
         });
       }
@@ -302,15 +352,10 @@ export async function createSale(data: {
     entityLabel: saleNumber,
     summary:
       data.saleType === SaleType.CREDITO
-        ? `Venta a crédito ${saleNumber} por ${formatMoney(total)} — plan ${creditPlanNumber}`
-        : `Venta ${saleNumber} por ${formatMoney(total)} (${data.items.length} ítems)`,
+        ? `Venta a crédito ${saleNumber} por ${formatMoney(auditedTotal)} — plan ${creditPlanNumber}`
+        : `Venta ${saleNumber} por ${formatMoney(auditedTotal)} (${data.items.length} ítems)`,
     changes: {
-      items: data.items.map((i) => ({
-        product: i.productName,
-        lot: i.lotNumber,
-        qty: i.quantity,
-        price: i.unitPrice,
-      })),
+      items: auditedItems,
       discount,
       saleType: data.saleType,
       paymentMethod: data.paymentMethod,
@@ -365,11 +410,30 @@ export async function cancelSale(id: string) {
 
   const sale = await prisma.sale.findUnique({
     where: { id },
-    include: { items: true },
+    include: {
+      items: true,
+      creditPlan: {
+        include: {
+          installments: { include: { payments: true } },
+        },
+      },
+    },
   });
 
   if (!sale || sale.status === SaleStatus.CANCELLED) {
     return { error: "Venta no encontrada o ya cancelada" };
+  }
+
+  if (sale.creditPlan) {
+    const hasPayments = sale.creditPlan.installments.some(
+      (inst) => inst.payments.length > 0 || inst.paidCents > 0
+    );
+    if (hasPayments) {
+      return {
+        error:
+          "No se puede cancelar la venta: el plan de crédito tiene abonos registrados. Anule los abonos o cancele el plan desde Cartera.",
+      };
+    }
   }
 
   await prisma.$transaction(async (tx) => {
@@ -392,6 +456,12 @@ export async function cancelSale(id: string) {
       where: { id },
       data: { status: SaleStatus.CANCELLED },
     });
+    if (sale.creditPlan) {
+      await tx.creditPlan.update({
+        where: { id: sale.creditPlan.id },
+        data: { status: CreditPlanStatus.CANCELLED },
+      });
+    }
   });
 
   await logAudit({
@@ -400,14 +470,20 @@ export async function cancelSale(id: string) {
     entityType: "Sale",
     entityId: id,
     entityLabel: sale.saleNumber,
-    summary: `Canceló venta ${sale.saleNumber} (stock restaurado)`,
+    summary: sale.creditPlan
+      ? `Canceló venta ${sale.saleNumber} (stock restaurado, cartera ${sale.creditPlan.planNumber} cancelada)`
+      : `Canceló venta ${sale.saleNumber} (stock restaurado)`,
     changes: {
       items: sale.items.map((i) => ({ productId: i.productId, lotId: i.lotId, qty: i.quantity })),
+      creditPlanNumber: sale.creditPlan?.planNumber,
     },
   });
 
   revalidatePath("/sales");
   revalidatePath("/lots");
+  revalidatePath("/credit");
+  if (sale.customerId) revalidatePath(`/customers/${sale.customerId}`);
+  if (sale.creditPlan) revalidatePath(`/credit/${sale.creditPlan.id}`);
   return { success: true };
 }
 
