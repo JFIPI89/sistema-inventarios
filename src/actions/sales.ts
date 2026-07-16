@@ -9,6 +9,7 @@ import { buildChanges, logAudit } from "@/lib/audit";
 import { assertCreditLimit, createCreditPlanInTx } from "@/actions/credit";
 import { toCents } from "@/lib/money";
 import { formatMoney } from "@/lib/currency";
+import { inventoryQtyFromSale, type SaleQtyMode } from "@/lib/sale-qty";
 import {
   addAppCalendarDays,
   parseAppDate,
@@ -16,6 +17,9 @@ import {
   startOfZonedDay,
   toDateKey,
 } from "@/lib/timezone";
+
+export type { SaleQtyMode };
+export { inventoryQtyFromSale };
 
 async function requireSalesWrite() {
   const session = await getSession();
@@ -139,6 +143,10 @@ export type CartItem = {
   lotId: string;
   productName: string;
   lotNumber: string;
+  /** What the cashier typed (boxes or units depending on saleMode). */
+  inputQty: number;
+  saleMode: SaleQtyMode;
+  /** Inventory units deducted from the lot (computed). */
   quantity: number;
   unitPrice: number;
 };
@@ -240,22 +248,35 @@ export async function createSale(data: {
         if (lot.productId !== item.productId) {
           throw new Error(`El lote ${item.lotNumber} no corresponde al producto seleccionado`);
         }
-        if (lot.quantity < item.quantity) {
-          throw new Error(`Stock insuficiente para ${product.name} / ${lot.lotNumber}`);
+
+        const saleMode: SaleQtyMode = item.saleMode === "BOX" ? "BOX" : "UNIT";
+        const inputQty = Math.max(0, Math.floor(Number(item.inputQty) || 0));
+        if (inputQty < 1) {
+          throw new Error(`Cantidad inválida para ${product.name}`);
+        }
+
+        const quantity = inventoryQtyFromSale(inputQty, saleMode, product.unitsPerBox);
+        if (quantity < 1) {
+          throw new Error(`Cantidad inválida para ${product.name}`);
+        }
+        if (lot.quantity < quantity) {
+          throw new Error(
+            `Stock insuficiente para ${product.name} / ${lot.lotNumber} (pide ${quantity}, hay ${lot.quantity})`
+          );
         }
         if (product.salePrice <= 0) {
           throw new Error(`El producto ${product.name} no tiene precio de venta válido`);
         }
 
         const unitPrice = product.salePrice;
-        const lineTotal = unitPrice * item.quantity;
+        const lineTotal = unitPrice * quantity;
         subtotal += lineTotal;
         pricedItems.push({
           productId: product.id,
           lotId: lot.id,
           productName: product.name,
           lotNumber: lot.lotNumber,
-          quantity: item.quantity,
+          quantity,
           unitPrice,
           lineTotal,
           lotQty: lot.quantity,

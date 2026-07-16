@@ -82,6 +82,7 @@ export async function createProduct(formData: FormData) {
       description: String(formData.get("description") || "").trim() || null,
       categoryId: String(formData.get("categoryId") || "").trim() || null,
       unitOfMeasure: String(formData.get("unitOfMeasure") || "pza").trim(),
+      unitsPerBox: Math.max(1, parseInt(String(formData.get("unitsPerBox") || "1"), 10) || 1),
       costPrice: parseFloat(String(formData.get("costPrice") || "0")) || 0,
       salePrice: parseFloat(String(formData.get("salePrice") || "0")) || 0,
       minStock: parseInt(String(formData.get("minStock") || "0"), 10) || 0,
@@ -96,7 +97,13 @@ export async function createProduct(formData: FormData) {
     entityId: product.id,
     entityLabel: sku,
     summary: `Alta de producto ${sku} — ${name}`,
-    changes: { sku, name, salePrice: product.salePrice, minStock: product.minStock },
+    changes: {
+      sku,
+      name,
+      salePrice: product.salePrice,
+      unitsPerBox: product.unitsPerBox,
+      minStock: product.minStock,
+    },
   });
 
   revalidatePath("/products");
@@ -119,6 +126,7 @@ export async function updateProduct(id: string, formData: FormData) {
     description: String(formData.get("description") || "").trim() || null,
     categoryId: String(formData.get("categoryId") || "").trim() || null,
     unitOfMeasure: String(formData.get("unitOfMeasure") || "pza").trim(),
+    unitsPerBox: Math.max(1, parseInt(String(formData.get("unitsPerBox") || "1"), 10) || 1),
     costPrice: parseFloat(String(formData.get("costPrice") || "0")) || 0,
     salePrice: parseFloat(String(formData.get("salePrice") || "0")) || 0,
     minStock: parseInt(String(formData.get("minStock") || "0"), 10) || 0,
@@ -141,6 +149,7 @@ export async function updateProduct(id: string, formData: FormData) {
         name: before.name,
         salePrice: before.salePrice,
         costPrice: before.costPrice,
+        unitsPerBox: before.unitsPerBox,
         minStock: before.minStock,
         isActive: before.isActive,
       },
@@ -149,6 +158,7 @@ export async function updateProduct(id: string, formData: FormData) {
         name: afterData.name,
         salePrice: afterData.salePrice,
         costPrice: afterData.costPrice,
+        unitsPerBox: afterData.unitsPerBox,
         minStock: afterData.minStock,
         isActive: afterData.isActive,
       }

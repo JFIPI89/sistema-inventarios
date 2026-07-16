@@ -103,6 +103,8 @@ model Product {
   categoryId     String?
   category       Category?       @relation(fields: [categoryId], references: [id])
   unitOfMeasure  String          @default("pza")
+  /** How many inventory units are in one box/case when selling by caja. */
+  unitsPerBox    Int             @default(1)
   costPrice      Float           @default(0)
   salePrice      Float           @default(0)
   minStock       Int             @default(0)

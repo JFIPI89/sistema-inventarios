@@ -17,6 +17,7 @@ type ProductData = {
   description?: string | null;
   categoryId?: string | null;
   unitOfMeasure: string;
+  unitsPerBox?: number;
   costPrice: number;
   salePrice: number;
   minStock: number;
@@ -101,6 +102,19 @@ export function ProductForm({
             <div className="space-y-2">
               <Label htmlFor="unitOfMeasure">Unidad</Label>
               <Input id="unitOfMeasure" name="unitOfMeasure" defaultValue={product?.unitOfMeasure || "pza"} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="unitsPerBox">Unidades por caja</Label>
+              <Input
+                id="unitsPerBox"
+                name="unitsPerBox"
+                type="number"
+                min={1}
+                defaultValue={product?.unitsPerBox ?? 1}
+              />
+              <p className="text-xs text-muted-foreground">
+                Cuántas unidades de inventario trae 1 caja (ej. flop con 7 cajetillas → 7).
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="costPrice">Precio costo</Label>

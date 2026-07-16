@@ -112,6 +112,10 @@ export async function importProductsCsv(formData: FormData) {
       categoryId,
       unitOfMeasure:
         col("unitofmeasure") >= 0 ? cells[col("unitofmeasure")]?.trim() || "pza" : "pza",
+      unitsPerBox:
+        col("unitsperbox") >= 0
+          ? Math.max(1, parseInt(cells[col("unitsperbox")] || "1", 10) || 1)
+          : 1,
       costPrice: col("costprice") >= 0 ? parseFloat(cells[col("costprice")] || "0") || 0 : 0,
       salePrice: col("saleprice") >= 0 ? parseFloat(cells[col("saleprice")] || "0") || 0 : 0,
       minStock: col("minstock") >= 0 ? parseInt(cells[col("minstock")] || "0", 10) || 0 : 0,
