@@ -337,15 +337,13 @@ export function PosClient({ customers }: { customers: Customer[] }) {
                         }
                         className="flex h-9 w-full rounded-md border border-border bg-surface px-2 text-sm"
                       >
-                        <option value="UNIT">Unidad</option>
-                        <option value="BOX" disabled={item.unitsPerBox <= 1}>
-                          Caja ({item.unitsPerBox} u.)
-                        </option>
+                        <option value="UNIT">Unidad / pza</option>
+                        <option value="BOX">Caja ({item.unitsPerBox} pzas)</option>
                       </select>
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">
-                        Cantidad {item.saleMode === "BOX" ? "(cajas)" : "(unidades)"}
+                        Cantidad {item.saleMode === "BOX" ? "(cajas)" : "(pzas)"}
                       </Label>
                       <Input
                         type="number"
@@ -360,10 +358,10 @@ export function PosClient({ customers }: { customers: Customer[] }) {
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Descuenta {item.quantity} del inventario ·{" "}
+                    Descuenta {item.quantity} pzas del inventario ·{" "}
                     {formatCurrency(item.unitPrice * item.quantity)}
                     {item.saleMode === "BOX"
-                      ? ` (${item.inputQty} caja × ${item.unitsPerBox})`
+                      ? ` (${item.inputQty} caja × ${item.unitsPerBox} pzas)`
                       : ""}
                   </p>
                 </li>
