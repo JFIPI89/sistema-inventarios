@@ -1,13 +1,8 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition, useEffect } from "react";
-import {
-  searchProductsForSale,
-  createSale,
-  type CartItem,
-  type SaleQtyMode,
-} from "@/actions/sales";
-import { inventoryQtyFromSale } from "@/lib/sale-qty";
+import { searchProductsForSale, createSale, type CartItem } from "@/actions/sales";
+import { inventoryQtyFromSale, type SaleQtyMode } from "@/lib/sale-qty";
 import { getCustomerCreditProfile, type CustomerCreditProfile } from "@/actions/credit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

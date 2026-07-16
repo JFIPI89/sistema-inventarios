@@ -18,9 +18,6 @@ import {
   toDateKey,
 } from "@/lib/timezone";
 
-export type { SaleQtyMode };
-export { inventoryQtyFromSale };
-
 async function requireSalesWrite() {
   const session = await getSession();
   if (!session || !canWriteSales(session.role)) {
