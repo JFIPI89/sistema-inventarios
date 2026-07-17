@@ -35,7 +35,7 @@ function debugPos(hypothesisId: string, message: string, data: Record<string, un
     },
     body: JSON.stringify({
       sessionId: "bf78b4",
-      runId: "pre-fix-1",
+      runId: "post-fix",
       hypothesisId,
       location: "src/components/sales/pos-client.tsx",
       message,
@@ -212,7 +212,8 @@ export function PosClient({ customers }: { customers: Customer[] }) {
           if (saleMode === "BOX") {
             const maxBoxes = Math.floor(line.lotStock / Math.max(1, line.unitsPerBox));
             if (maxBoxes < 1) {
-              debugPos("H2", "box mode rejected because stock is below one box", {
+              // Always apply BOX selection so the UI switches; block checkout via stock check.
+              debugPos("H2", "box mode applied but stock below one full box", {
                 lotId,
                 prevMode,
                 requestedMode: saleMode,
@@ -222,16 +223,24 @@ export function PosClient({ customers }: { customers: Customer[] }) {
                 lotStock: line.lotStock,
                 maxBoxes,
               });
-              setMessage("Stock insuficiente para vender por caja");
-              return line;
+              setMessage(
+                `Stock insuficiente para 1 caja (${line.unitsPerBox} pzas). Disponible: ${line.lotStock}`
+              );
+              return {
+                ...line,
+                saleMode,
+                inputQty: 1,
+                quantity: line.unitsPerBox,
+              };
             }
             inputQty = maxBoxes;
             quantity = inventoryQtyFromSale(inputQty, saleMode, line.unitsPerBox);
+            setMessage("Cantidad ajustada al stock disponible");
           } else {
             inputQty = Math.max(1, line.lotStock);
             quantity = inputQty;
+            setMessage("Cantidad ajustada al stock disponible");
           }
-          setMessage("Cantidad ajustada al stock disponible");
         } else {
           setMessage(null);
         }
@@ -244,6 +253,7 @@ export function PosClient({ customers }: { customers: Customer[] }) {
           quantity,
           unitsPerBox: line.unitsPerBox,
           lotStock: line.lotStock,
+          runId: "post-fix",
         });
         return { ...line, saleMode, inputQty, quantity };
       })
@@ -255,6 +265,7 @@ export function PosClient({ customers }: { customers: Customer[] }) {
   }
 
   const subtotal = cart.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+  const overstockLine = cart.find((i) => i.quantity > i.lotStock);
   const total = Math.max(0, subtotal - discount);
   const totalCents = toCents(total);
   const selectedCustomer = customers.find((c) => c.id === customerId);
@@ -273,6 +284,9 @@ export function PosClient({ customers }: { customers: Customer[] }) {
     }
     return null;
   }, [saleType, customerId, selectedCustomer, creditProfile, totalCents]);
+
+  const canCheckout =
+    cart.length > 0 && !isPending && !creditBlockReason && !overstockLine;
 
   const preview = useMemo(() => {
     if (saleType !== SaleType.CREDITO || totalCents <= 0) return [];
@@ -593,9 +607,16 @@ export function PosClient({ customers }: { customers: Customer[] }) {
             </p>
           )}
 
+          {overstockLine && (
+            <p className="text-sm text-destructive">
+              {overstockLine.productName}: pide {overstockLine.quantity} pzas y solo hay{" "}
+              {overstockLine.lotStock} en el lote. Baja la cantidad o usa Pieza.
+            </p>
+          )}
+
           <Button
             className="w-full"
-            disabled={cart.length === 0 || isPending || !!creditBlockReason}
+            disabled={!canCheckout}
             onClick={handleCheckout}
           >
             {isPending ? "Procesando..." : saleType === SaleType.CREDITO ? "Registrar crédito" : "Cobrar"}
