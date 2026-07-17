@@ -142,13 +142,29 @@ export function PosClient({ customers }: { customers: Customer[] }) {
     setCart((prev) =>
       prev.map((line) => {
         if (line.lotId !== lotId) return line;
+
+        const prevMode = line.saleMode;
         const saleMode = patch.saleMode ?? line.saleMode;
         let inputQty = patch.inputQty ?? line.inputQty;
-        inputQty = Math.max(1, Math.floor(inputQty) || 1);
+
+        // When switching mode, convert the cashier quantity so Pieza stays meaningful.
+        if (patch.saleMode && patch.saleMode !== prevMode && patch.inputQty == null) {
+          if (patch.saleMode === "UNIT") {
+            // boxes → pieces
+            inputQty = inventoryQtyFromSale(line.inputQty, "BOX", line.unitsPerBox);
+          } else {
+            // pieces → whole boxes (at least 1 if stock allows)
+            const boxes = Math.floor(line.quantity / Math.max(1, line.unitsPerBox));
+            inputQty = Math.max(1, boxes || 1);
+          }
+        }
+
+        inputQty = Math.max(1, Math.floor(Number(inputQty)) || 1);
         let quantity = inventoryQtyFromSale(inputQty, saleMode, line.unitsPerBox);
+
         if (quantity > line.lotStock) {
           if (saleMode === "BOX") {
-            const maxBoxes = Math.floor(line.lotStock / line.unitsPerBox);
+            const maxBoxes = Math.floor(line.lotStock / Math.max(1, line.unitsPerBox));
             if (maxBoxes < 1) {
               setMessage("Stock insuficiente para vender por caja");
               return line;
@@ -156,13 +172,14 @@ export function PosClient({ customers }: { customers: Customer[] }) {
             inputQty = maxBoxes;
             quantity = inventoryQtyFromSale(inputQty, saleMode, line.unitsPerBox);
           } else {
-            inputQty = line.lotStock;
+            inputQty = Math.max(1, line.lotStock);
             quantity = inputQty;
           }
           setMessage("Cantidad ajustada al stock disponible");
         } else {
           setMessage(null);
         }
+
         return { ...line, saleMode, inputQty, quantity };
       })
     );
@@ -267,7 +284,7 @@ export function PosClient({ customers }: { customers: Customer[] }) {
           />
           <p className="text-xs text-muted-foreground">
             Escribe para ver sugerencias y haz clic para agregar. En el carrito elige{" "}
-            <strong>Unidad</strong> o <strong>Caja</strong> y escribe la cantidad.
+            <strong>Pieza</strong> o <strong>Caja</strong> y escribe la cantidad.
           </p>
         </CardContent>
       </Card>
@@ -330,20 +347,35 @@ export function PosClient({ customers }: { customers: Customer[] }) {
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
                       <Label className="text-xs">Vender por</Label>
-                      <select
-                        value={item.saleMode}
-                        onChange={(e) =>
-                          updateLine(item.lotId, { saleMode: e.target.value as SaleQtyMode })
-                        }
-                        className="flex h-9 w-full rounded-md border border-border bg-surface px-2 text-sm"
-                      >
-                        <option value="UNIT">Unidad / pza</option>
-                        <option value="BOX">Caja ({item.unitsPerBox} pzas)</option>
-                      </select>
+                      <div className="grid grid-cols-2 gap-1">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={item.saleMode === "UNIT" ? "default" : "outline"}
+                          className="h-9"
+                          onClick={() => updateLine(item.lotId, { saleMode: "UNIT" })}
+                        >
+                          Pieza
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={item.saleMode === "BOX" ? "default" : "outline"}
+                          className="h-9"
+                          onClick={() => updateLine(item.lotId, { saleMode: "BOX" })}
+                        >
+                          Caja
+                        </Button>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        {item.saleMode === "UNIT"
+                          ? "Modo pieza: 1 = 1 unidad de inventario"
+                          : `Modo caja: 1 caja = ${item.unitsPerBox} piezas`}
+                      </p>
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">
-                        Cantidad {item.saleMode === "BOX" ? "(cajas)" : "(pzas)"}
+                        Cantidad {item.saleMode === "BOX" ? "(cajas)" : "(piezas)"}
                       </Label>
                       <Input
                         type="number"
@@ -358,10 +390,10 @@ export function PosClient({ customers }: { customers: Customer[] }) {
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Descuenta {item.quantity} pzas del inventario ·{" "}
+                    Descuenta {item.quantity} piezas ·{" "}
                     {formatCurrency(item.unitPrice * item.quantity)}
                     {item.saleMode === "BOX"
-                      ? ` (${item.inputQty} caja × ${item.unitsPerBox} pzas)`
+                      ? ` (${item.inputQty} caja × ${item.unitsPerBox})`
                       : ""}
                   </p>
                 </li>
