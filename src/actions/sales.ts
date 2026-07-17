@@ -6,7 +6,7 @@ import { getSession } from "@/lib/auth";
 import { canWriteSales } from "@/lib/permissions";
 import { PaymentMethod, SaleStatus, SaleType, StockMovementType, CreditPeriodUnit, CreditPlanStatus, Role } from "@prisma/client";
 import { buildChanges, logAudit } from "@/lib/audit";
-import { assertCreditLimit, createCreditPlanInTx } from "@/actions/credit";
+import { assertCreditLimit, createCreditPlanInTx, rebuildInstallmentAmountsInTx } from "@/actions/credit";
 import { toCents } from "@/lib/money";
 import { formatMoney } from "@/lib/currency";
 import { inventoryQtyFromSale, type SaleQtyMode } from "@/lib/sale-qty";
@@ -418,9 +418,222 @@ export async function getSale(id: string) {
       customer: true,
       user: { select: { name: true, email: true } },
       items: { include: { product: true, lot: true } },
-      creditPlan: { select: { id: true, planNumber: true, status: true } },
+      creditPlan: {
+        select: {
+          id: true,
+          planNumber: true,
+          status: true,
+          installments: {
+            select: {
+              id: true,
+              paidCents: true,
+              _count: { select: { payments: true } },
+            },
+          },
+        },
+      },
     },
   });
+}
+
+export async function updateSale(
+  id: string,
+  data: {
+    discount: number;
+    paymentMethod?: PaymentMethod;
+    items: Array<{ id: string; quantity: number }>;
+  }
+) {
+  const session = await requireSalesWrite();
+
+  const sale = await prisma.sale.findUnique({
+    where: { id },
+    include: {
+      items: { include: { product: true, lot: true } },
+      creditPlan: {
+        include: {
+          installments: { include: { payments: true } },
+        },
+      },
+    },
+  });
+
+  if (!sale) return { error: "Venta no encontrada" };
+  if (sale.status !== SaleStatus.COMPLETED) {
+    return { error: "Solo se pueden editar ventas completadas" };
+  }
+
+  if (sale.creditPlan) {
+    const hasPayments = sale.creditPlan.installments.some(
+      (inst) => inst.payments.length > 0 || inst.paidCents > 0
+    );
+    if (hasPayments) {
+      return {
+        error:
+          "No se puede editar: el plan de crédito tiene abonos. Anule los abonos desde Cartera.",
+      };
+    }
+  }
+
+  if (!data.items.length) return { error: "La venta debe tener al menos un ítem" };
+
+  const discount = Math.max(0, Number(data.discount) || 0);
+  const qtyByItemId = new Map(data.items.map((i) => [i.id, Math.floor(Number(i.quantity) || 0)]));
+
+  for (const item of sale.items) {
+    const q = qtyByItemId.get(item.id);
+    if (q == null) return { error: "Faltan ítems en la edición" };
+    if (q < 1) return { error: `Cantidad inválida para ${item.product.name}` };
+  }
+
+  if (qtyByItemId.size !== sale.items.length) {
+    return { error: "No se pueden agregar ni quitar líneas en esta edición" };
+  }
+
+  const beforeSnapshot = {
+    discount: sale.discount,
+    paymentMethod: sale.paymentMethod,
+    subtotal: sale.subtotal,
+    total: sale.total,
+    items: sale.items.map((i) => ({
+      id: i.id,
+      product: i.product.name,
+      lot: i.lot.lotNumber,
+      qty: i.quantity,
+      unitPrice: i.unitPrice,
+      lineTotal: i.lineTotal,
+    })),
+  };
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      let subtotal = 0;
+
+      for (const item of sale.items) {
+        const newQty = qtyByItemId.get(item.id)!;
+        const delta = newQty - item.quantity;
+        const lineTotal = item.unitPrice * newQty;
+        subtotal += lineTotal;
+
+        if (delta > 0) {
+          const lot = await tx.lot.findUnique({ where: { id: item.lotId } });
+          if (!lot || lot.quantity < delta) {
+            throw new Error(
+              `Stock insuficiente para ${item.product.name} / ${item.lot.lotNumber} (faltan ${delta})`
+            );
+          }
+          await tx.lot.update({
+            where: { id: item.lotId },
+            data: { quantity: { decrement: delta } },
+          });
+          await tx.stockMovement.create({
+            data: {
+              productId: item.productId,
+              lotId: item.lotId,
+              type: StockMovementType.OUT,
+              quantity: -delta,
+              reference: `Edición ${sale.saleNumber}`,
+            },
+          });
+        } else if (delta < 0) {
+          const restore = -delta;
+          await tx.lot.update({
+            where: { id: item.lotId },
+            data: { quantity: { increment: restore } },
+          });
+          await tx.stockMovement.create({
+            data: {
+              productId: item.productId,
+              lotId: item.lotId,
+              type: StockMovementType.IN,
+              quantity: restore,
+              reference: `Edición ${sale.saleNumber}`,
+            },
+          });
+        }
+
+        if (delta !== 0) {
+          await tx.saleItem.update({
+            where: { id: item.id },
+            data: { quantity: newQty, lineTotal },
+          });
+        }
+      }
+
+      const total = Math.max(0, subtotal - discount);
+      if (total <= 0) throw new Error("El total debe ser mayor a cero");
+
+      const paymentMethod =
+        sale.saleType === SaleType.CREDITO
+          ? sale.paymentMethod
+          : data.paymentMethod ?? sale.paymentMethod;
+
+      await tx.sale.update({
+        where: { id },
+        data: {
+          subtotal,
+          discount,
+          total,
+          ...(sale.saleType === SaleType.CONTADO ? { paymentMethod } : {}),
+        },
+      });
+
+      if (sale.creditPlan && sale.customerId) {
+        const totalCents = toCents(total);
+        const prevCents = toCents(sale.total);
+        if (totalCents > prevCents) {
+          await assertCreditLimit(sale.customerId, totalCents - prevCents, tx);
+        }
+        await rebuildInstallmentAmountsInTx(tx, sale.creditPlan.id, totalCents);
+      }
+    });
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Error al editar venta" };
+  }
+
+  const after = await prisma.sale.findUnique({
+    where: { id },
+    include: {
+      items: { include: { product: true, lot: true } },
+      creditPlan: { select: { planNumber: true } },
+    },
+  });
+
+  await logAudit({
+    session,
+    action: "UPDATE",
+    entityType: "Sale",
+    entityId: id,
+    entityLabel: sale.saleNumber,
+    summary: `Modificó venta ${sale.saleNumber}${
+      after?.creditPlan ? ` (cartera ${after.creditPlan.planNumber} recalculada)` : ""
+    }`,
+    changes: buildChanges(beforeSnapshot, {
+      discount: after?.discount ?? discount,
+      paymentMethod: after?.paymentMethod ?? sale.paymentMethod,
+      subtotal: after?.subtotal ?? 0,
+      total: after?.total ?? 0,
+      items:
+        after?.items.map((i) => ({
+          id: i.id,
+          product: i.product.name,
+          lot: i.lot.lotNumber,
+          qty: i.quantity,
+          unitPrice: i.unitPrice,
+          lineTotal: i.lineTotal,
+        })) ?? [],
+    }),
+  });
+
+  revalidatePath("/sales");
+  revalidatePath(`/sales/${id}`);
+  revalidatePath("/lots");
+  revalidatePath("/credit");
+  revalidatePath("/admin/historico");
+  revalidatePath("/");
+  if (sale.customerId) revalidatePath(`/customers/${sale.customerId}`);
+  if (sale.creditPlan) revalidatePath(`/credit/${sale.creditPlan.id}`);
+  return { success: true };
 }
 
 export async function cancelSale(id: string) {

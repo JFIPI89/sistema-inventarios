@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getSale, cancelSale } from "@/actions/sales";
+import { getSale } from "@/actions/sales";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import {
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { SALE_TYPE_LABELS, PAYMENT_METHOD_LABELS } from "@/lib/credit-labels";
 import { CancelSaleButton } from "@/components/sales/cancel-sale-button";
+import { EditSaleForm } from "@/components/sales/edit-sale-form";
 import { PageHeader } from "@/components/layout/page-header";
 
 export default async function SaleDetailPage({
@@ -25,6 +26,11 @@ export default async function SaleDetailPage({
   const { id } = await params;
   const sale = await getSale(id);
   if (!sale) notFound();
+
+  const creditLocked =
+    sale.creditPlan?.installments.some(
+      (inst) => inst.paidCents > 0 || inst._count.payments > 0
+    ) ?? false;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -62,6 +68,10 @@ export default async function SaleDetailPage({
             <span className="text-muted-foreground">Pago:</span>{" "}
             {PAYMENT_METHOD_LABELS[sale.paymentMethod]}
           </p>
+          <p>
+            <span className="text-muted-foreground">Descuento:</span>{" "}
+            {formatCurrency(sale.discount)}
+          </p>
           {sale.creditPlan && (
             <p>
               <span className="text-muted-foreground">Cartera:</span>{" "}
@@ -98,10 +108,32 @@ export default async function SaleDetailPage({
         </Table>
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xl font-bold">Total: {formatCurrency(sale.total)}</p>
         {sale.status === "COMPLETED" && <CancelSaleButton saleId={sale.id} />}
       </div>
+
+      {sale.status === "COMPLETED" && (
+        <EditSaleForm
+          saleId={sale.id}
+          saleType={sale.saleType}
+          discount={sale.discount}
+          paymentMethod={sale.paymentMethod}
+          lockedReason={
+            creditLocked
+              ? "Esta venta a crédito tiene abonos: no se puede editar hasta anular los abonos en Cartera."
+              : null
+          }
+          items={sale.items.map((item) => ({
+            id: item.id,
+            productName: item.product.name,
+            lotNumber: item.lot.lotNumber,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            availableStock: item.lot.quantity,
+          }))}
+        />
+      )}
     </div>
   );
 }

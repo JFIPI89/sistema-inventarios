@@ -107,6 +107,55 @@ export async function createCreditPlanInTx(
   return plan;
 }
 
+/** Redistribute installment amounts after sale total changes (no payments allowed). */
+export async function rebuildInstallmentAmountsInTx(
+  tx: Prisma.TransactionClient,
+  planId: string,
+  newTotalCents: number
+) {
+  if (newTotalCents <= 0) {
+    throw new Error("El monto del plan debe ser mayor a cero");
+  }
+
+  const plan = await tx.creditPlan.findUnique({
+    where: { id: planId },
+    include: {
+      installments: {
+        include: { payments: true },
+        orderBy: { number: "asc" },
+      },
+    },
+  });
+  if (!plan) throw new Error("Plan de crédito no encontrado");
+
+  const hasPayments = plan.installments.some(
+    (inst) => inst.payments.length > 0 || inst.paidCents > 0
+  );
+  if (hasPayments) {
+    throw new Error(
+      "No se puede editar: el plan de crédito tiene abonos. Anule los abonos desde Cartera."
+    );
+  }
+
+  const amounts = splitInstallments(newTotalCents, plan.installmentCount);
+
+  await tx.creditPlan.update({
+    where: { id: planId },
+    data: { totalCents: newTotalCents },
+  });
+
+  for (let i = 0; i < plan.installments.length; i++) {
+    const inst = plan.installments[i]!;
+    await tx.creditInstallment.update({
+      where: { id: inst.id },
+      data: {
+        amountCents: amounts[i]!,
+        status: installmentStatusFromPaid(amounts[i]!, 0, inst.dueDate),
+      },
+    });
+  }
+}
+
 export async function createCreditPlanManual(data: {
   customerId: string;
   totalAmount: number;
