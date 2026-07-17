@@ -25,6 +25,27 @@ type PosCartLine = CartItem & {
   lotStock: number;
 };
 
+function debugPos(hypothesisId: string, message: string, data: Record<string, unknown>) {
+  // #region agent log
+  fetch("http://127.0.0.1:7480/ingest/e9476fae-2a55-46d4-85a2-8659d581e51e", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "bf78b4",
+    },
+    body: JSON.stringify({
+      sessionId: "bf78b4",
+      runId: "pre-fix-1",
+      hypothesisId,
+      location: "src/components/sales/pos-client.tsx",
+      message,
+      data,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+}
+
 function resetSaleFormState() {
   return {
     cart: [] as PosCartLine[],
@@ -47,6 +68,17 @@ function buildLine(
   const unitsPerBox = Math.max(1, product.unitsPerBox || 1);
   const qty = Math.max(1, Math.floor(inputQty) || 1);
   const quantity = inventoryQtyFromSale(qty, saleMode, unitsPerBox);
+  debugPos("H4", "buildLine product stock metadata", {
+    productId: product.id,
+    sku: product.sku,
+    unitsPerBox: product.unitsPerBox,
+    normalizedUnitsPerBox: unitsPerBox,
+    lotId: lot.id,
+    lotQty: lot.quantity,
+    saleMode,
+    inputQty: qty,
+    quantity,
+  });
   return {
     productId: product.id,
     lotId: lot.id,
@@ -90,6 +122,19 @@ export function PosClient({ customers }: { customers: Customer[] }) {
       cancelled = true;
     };
   }, [customerId, saleType]);
+
+  useEffect(() => {
+    debugPos("H3", "cart state after render", {
+      cart: cart.map((line) => ({
+        lotId: line.lotId,
+        saleMode: line.saleMode,
+        inputQty: line.inputQty,
+        quantity: line.quantity,
+        unitsPerBox: line.unitsPerBox,
+        lotStock: line.lotStock,
+      })),
+    });
+  }, [cart]);
 
   async function fetchProductSuggestions(q: string): Promise<LiveSearchItem[]> {
     const products = await searchProductsForSale(q);
@@ -139,6 +184,7 @@ export function PosClient({ customers }: { customers: Customer[] }) {
   }
 
   function updateLine(lotId: string, patch: { saleMode?: SaleQtyMode; inputQty?: number }) {
+    debugPos("H1", "updateLine called", { lotId, patch });
     setCart((prev) =>
       prev.map((line) => {
         if (line.lotId !== lotId) return line;
@@ -166,6 +212,16 @@ export function PosClient({ customers }: { customers: Customer[] }) {
           if (saleMode === "BOX") {
             const maxBoxes = Math.floor(line.lotStock / Math.max(1, line.unitsPerBox));
             if (maxBoxes < 1) {
+              debugPos("H2", "box mode rejected because stock is below one box", {
+                lotId,
+                prevMode,
+                requestedMode: saleMode,
+                inputQty,
+                quantity,
+                unitsPerBox: line.unitsPerBox,
+                lotStock: line.lotStock,
+                maxBoxes,
+              });
               setMessage("Stock insuficiente para vender por caja");
               return line;
             }
@@ -180,6 +236,15 @@ export function PosClient({ customers }: { customers: Customer[] }) {
           setMessage(null);
         }
 
+        debugPos("H2,H3", "updateLine returning updated line", {
+          lotId,
+          prevMode,
+          saleMode,
+          inputQty,
+          quantity,
+          unitsPerBox: line.unitsPerBox,
+          lotStock: line.lotStock,
+        });
         return { ...line, saleMode, inputQty, quantity };
       })
     );
@@ -353,7 +418,17 @@ export function PosClient({ customers }: { customers: Customer[] }) {
                           size="sm"
                           variant={item.saleMode === "UNIT" ? "default" : "outline"}
                           className="h-9"
-                          onClick={() => updateLine(item.lotId, { saleMode: "UNIT" })}
+                          onClick={() => {
+                            debugPos("H1,H5", "pieza button pressed", {
+                              lotId: item.lotId,
+                              currentMode: item.saleMode,
+                              inputQty: item.inputQty,
+                              quantity: item.quantity,
+                              unitsPerBox: item.unitsPerBox,
+                              lotStock: item.lotStock,
+                            });
+                            updateLine(item.lotId, { saleMode: "UNIT" });
+                          }}
                         >
                           Pieza
                         </Button>
@@ -362,7 +437,17 @@ export function PosClient({ customers }: { customers: Customer[] }) {
                           size="sm"
                           variant={item.saleMode === "BOX" ? "default" : "outline"}
                           className="h-9"
-                          onClick={() => updateLine(item.lotId, { saleMode: "BOX" })}
+                          onClick={() => {
+                            debugPos("H1,H5", "caja button pressed", {
+                              lotId: item.lotId,
+                              currentMode: item.saleMode,
+                              inputQty: item.inputQty,
+                              quantity: item.quantity,
+                              unitsPerBox: item.unitsPerBox,
+                              lotStock: item.lotStock,
+                            });
+                            updateLine(item.lotId, { saleMode: "BOX" });
+                          }}
                         >
                           Caja
                         </Button>
