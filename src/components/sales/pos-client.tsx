@@ -107,6 +107,8 @@ export function PosClient({ customers }: { customers: Customer[] }) {
   const [isPending, startTransition] = useTransition();
   const [creditProfile, setCreditProfile] = useState<CustomerCreditProfile | null>(null);
   const [searchResetKey, setSearchResetKey] = useState(0);
+  /** Draft text while typing qty — avoids forcing 1 on clear and mid-keystroke clamp. */
+  const [qtyDrafts, setQtyDrafts] = useState<Record<string, string>>({});
   const productCache = useRef<Map<string, SearchProduct>>(new Map());
 
   useEffect(() => {
@@ -192,6 +194,7 @@ export function PosClient({ customers }: { customers: Customer[] }) {
         const prevMode = line.saleMode;
         const saleMode = patch.saleMode ?? line.saleMode;
         let inputQty = patch.inputQty ?? line.inputQty;
+        const rawPatchQty = patch.inputQty;
 
         // When switching mode, convert the cashier quantity so Pieza stays meaningful.
         if (patch.saleMode && patch.saleMode !== prevMode && patch.inputQty == null) {
@@ -205,63 +208,110 @@ export function PosClient({ customers }: { customers: Customer[] }) {
           }
         }
 
+        const beforeMinClamp = inputQty;
+        // Soft min: keep cashier digits as typed (>=1 when committing). Do NOT clamp to lotStock here —
+        // that made mid-typing values (e.g. 120 while aiming for 20) jump to stock (34).
         inputQty = Math.max(1, Math.floor(Number(inputQty)) || 1);
         let quantity = inventoryQtyFromSale(inputQty, saleMode, line.unitsPerBox);
+        let stockClamp: "none" | "soft-overstock" | "box-below-one" = "none";
+
+        if (saleMode === "BOX" && patch.saleMode === "BOX" && patch.saleMode !== prevMode) {
+          const maxBoxes = Math.floor(line.lotStock / Math.max(1, line.unitsPerBox));
+          if (maxBoxes < 1) {
+            stockClamp = "box-below-one";
+            debugPos("H3", "box mode applied but stock below one full box", {
+              lotId,
+              prevMode,
+              requestedMode: saleMode,
+              inputQty,
+              quantity,
+              unitsPerBox: line.unitsPerBox,
+              lotStock: line.lotStock,
+              maxBoxes,
+            });
+            setMessage(
+              `Stock insuficiente para 1 caja (${line.unitsPerBox} pzas). Disponible: ${line.lotStock}`
+            );
+            return {
+              ...line,
+              saleMode,
+              inputQty: 1,
+              quantity: line.unitsPerBox,
+            };
+          }
+        }
 
         if (quantity > line.lotStock) {
-          if (saleMode === "BOX") {
-            const maxBoxes = Math.floor(line.lotStock / Math.max(1, line.unitsPerBox));
-            if (maxBoxes < 1) {
-              // Always apply BOX selection so the UI switches; block checkout via stock check.
-              debugPos("H2", "box mode applied but stock below one full box", {
-                lotId,
-                prevMode,
-                requestedMode: saleMode,
-                inputQty,
-                quantity,
-                unitsPerBox: line.unitsPerBox,
-                lotStock: line.lotStock,
-                maxBoxes,
-              });
-              setMessage(
-                `Stock insuficiente para 1 caja (${line.unitsPerBox} pzas). Disponible: ${line.lotStock}`
-              );
-              return {
-                ...line,
-                saleMode,
-                inputQty: 1,
-                quantity: line.unitsPerBox,
-              };
-            }
-            inputQty = maxBoxes;
-            quantity = inventoryQtyFromSale(inputQty, saleMode, line.unitsPerBox);
-            setMessage("Cantidad ajustada al stock disponible");
-          } else {
-            inputQty = Math.max(1, line.lotStock);
-            quantity = inputQty;
-            setMessage("Cantidad ajustada al stock disponible");
-          }
+          stockClamp = "soft-overstock";
+          setMessage(
+            `Stock insuficiente: pide ${quantity} pzas, hay ${line.lotStock}`
+          );
         } else {
           setMessage(null);
         }
 
-        debugPos("H2,H3", "updateLine returning updated line", {
+        // #region agent log
+        debugPos("H1,H2,H3", "updateLine qty result", {
           lotId,
           prevMode,
           saleMode,
+          rawPatchQty: rawPatchQty ?? null,
+          beforeMinClamp,
           inputQty,
           quantity,
           unitsPerBox: line.unitsPerBox,
           lotStock: line.lotStock,
-          runId: "post-fix",
+          stockClamp,
+          hardClampedToStock: false,
         });
+        // #endregion
         return { ...line, saleMode, inputQty, quantity };
       })
     );
   }
 
   function removeFromCart(lotId: string) {
+    setQtyDrafts((prev) => {
+      const next = { ...prev };
+      delete next[lotId];
+      return next;
+    });
     setCart(cart.filter((c) => c.lotId !== lotId));
+  }
+
+  function onQtyInputChange(lotId: string, raw: string, meta: PosCartLine) {
+    // #region agent log
+    debugPos("H1,H2,H4", "qty input onChange", {
+      lotId,
+      raw,
+      prevInputQty: meta.inputQty,
+      saleMode: meta.saleMode,
+      lotStock: meta.lotStock,
+      unitsPerBox: meta.unitsPerBox,
+      emptyAllowed: raw === "",
+    });
+    // #endregion
+    setQtyDrafts((prev) => ({ ...prev, [lotId]: raw }));
+    if (raw.trim() === "") return;
+    const parsed = parseInt(raw, 10);
+    if (Number.isNaN(parsed) || parsed < 1) return;
+    updateLine(lotId, { inputQty: parsed });
+  }
+
+  function onQtyInputBlur(lotId: string) {
+    const raw = qtyDrafts[lotId];
+    // #region agent log
+    debugPos("H1", "qty input blur", { lotId, raw: raw ?? null });
+    // #endregion
+    if (raw === undefined) return;
+    const parsed = parseInt(raw, 10);
+    const next = Number.isNaN(parsed) || parsed < 1 ? 1 : parsed;
+    updateLine(lotId, { inputQty: next });
+    setQtyDrafts((prev) => {
+      const nextDrafts = { ...prev };
+      delete nextDrafts[lotId];
+      return nextDrafts;
+    });
   }
 
   const subtotal = cart.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
@@ -335,6 +385,7 @@ export function PosClient({ customers }: { customers: Customer[] }) {
         setStartDate(next.startDate);
         setCreditProfile(null);
         productCache.current.clear();
+        setQtyDrafts({});
         setSearchResetKey((k) => k + 1);
         const extra =
           result.creditPlanNumber ? ` — Cartera ${result.creditPlanNumber}` : "";
@@ -441,6 +492,11 @@ export function PosClient({ customers }: { customers: Customer[] }) {
                               unitsPerBox: item.unitsPerBox,
                               lotStock: item.lotStock,
                             });
+                            setQtyDrafts((prev) => {
+                              const next = { ...prev };
+                              delete next[item.lotId];
+                              return next;
+                            });
                             updateLine(item.lotId, { saleMode: "UNIT" });
                           }}
                         >
@@ -459,6 +515,11 @@ export function PosClient({ customers }: { customers: Customer[] }) {
                               quantity: item.quantity,
                               unitsPerBox: item.unitsPerBox,
                               lotStock: item.lotStock,
+                            });
+                            setQtyDrafts((prev) => {
+                              const next = { ...prev };
+                              delete next[item.lotId];
+                              return next;
                             });
                             updateLine(item.lotId, { saleMode: "BOX" });
                           }}
@@ -479,12 +540,14 @@ export function PosClient({ customers }: { customers: Customer[] }) {
                       <Input
                         type="number"
                         min={1}
-                        value={item.inputQty}
-                        onChange={(e) =>
-                          updateLine(item.lotId, {
-                            inputQty: parseInt(e.target.value, 10) || 1,
-                          })
+                        inputMode="numeric"
+                        value={
+                          qtyDrafts[item.lotId] !== undefined
+                            ? qtyDrafts[item.lotId]
+                            : String(item.inputQty)
                         }
+                        onChange={(e) => onQtyInputChange(item.lotId, e.target.value, item)}
+                        onBlur={() => onQtyInputBlur(item.lotId)}
                       />
                     </div>
                   </div>
